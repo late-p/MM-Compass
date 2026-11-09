@@ -343,7 +343,7 @@ def _job(storage, label, user):
     try:
         cfg, warns, used, log = prepare(storage, label, user)
         inputs = cfg["inputs"]
-        env = dict(os.environ, GADONG_CFG=os.path.join(work, "cfg.json"), PYTHONPATH=CALC, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+        env = dict(os.environ, GADONG_CFG=os.path.join(work, "cfg.json"), PYTHONPATH=os.pathsep.join(p for p in (CALC, os.environ.get("PYTHONPATH", "")) if p), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
         for i, (name, cmd) in enumerate(STEPS, 1):
             _set(storage, label, step=f"{i}/{len(STEPS)} {name}")
             args = [sys.executable, os.path.join(CALC, cmd[0])] + [a.format(work=work) for a in cmd[1:]]

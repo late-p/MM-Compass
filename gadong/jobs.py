@@ -105,7 +105,9 @@ def advance(label):
                 if row["step"] <= len(run.STEPS):
                     name, command = run.STEPS[row["step"] - 1]
                     args = [sys.executable, os.path.join(run.CALC, command[0])] + [a.format(work=str(work) + os.sep) for a in command[1:]]
-                    env = dict(os.environ, GADONG_CFG=str(work / "cfg.json"), PYTHONPATH=run.CALC,
+                    # PYTHONPATH 를 덮어쓰면 Vercel 이 설치한 패키지(pandas 등)를 못 찾음 → 계산 폴더를 '앞에 덧붙임'
+                    env = dict(os.environ, GADONG_CFG=str(work / "cfg.json"),
+                               PYTHONPATH=os.pathsep.join(p for p in (run.CALC, os.environ.get("PYTHONPATH", "")) if p),
                                PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
                     result = subprocess.run(args, cwd=run.CALC, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=220)
                     context["log"].append(f"## {name}\n{result.stdout[-3000:]}\n{result.stderr[-6000:]}")

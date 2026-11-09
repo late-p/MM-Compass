@@ -105,13 +105,17 @@ def advance(label):
                 if row["step"] <= len(run.STEPS):
                     name, command = run.STEPS[row["step"] - 1]
                     args = [sys.executable, os.path.join(run.CALC, command[0])] + [a.format(work=str(work) + os.sep) for a in command[1:]]
-                    # PYTHONPATH 를 덮어쓰면 Vercel 이 설치한 패키지(pandas 등)를 못 찾음 → 계산 폴더를 '앞에 덧붙임'
+                    # 계산 폴더 + 부모 프로세스가 쓰는 import 경로를 모두 넘김 (Vercel 이 설치한 pandas 등을 자식 프로세스도 찾게)
                     env = dict(os.environ, GADONG_CFG=str(work / "cfg.json"),
-                               PYTHONPATH=os.pathsep.join(p for p in (run.CALC, os.environ.get("PYTHONPATH", "")) if p),
+                               PYTHONPATH=run.child_pythonpath(),
                                PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
                     result = subprocess.run(args, cwd=run.CALC, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=220)
                     context["log"].append(f"## {name}\n{result.stdout[-3000:]}\n{result.stderr[-6000:]}")
-                    if result.returncode: raise run.StepError(name, command[0], result.stderr, cfg["inputs"], context["used"])
+                    if result.returncode:
+                        err = result.stderr
+                        if "ModuleNotFoundError" in err:   # 다음에 같은 오류가 나면 원인이 바로 보이도록 진단 정보를 같이 남김
+                            err += f"\n[진단] python={sys.executable}\n[진단] PYTHONPATH(자식)={env.get('PYTHONPATH', '')[:1500]}\n[진단] sys.path(부모)={sys.path}"
+                        raise run.StepError(name, command[0], err, cfg["inputs"], context["used"])
                 else:
                     run.finish(root, label, row["by_user"], cfg, context["warnings"], context["used"])
             context_path.write_text(json.dumps(context, ensure_ascii=False), encoding="utf-8")

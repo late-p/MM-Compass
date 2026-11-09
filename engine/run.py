@@ -11,6 +11,14 @@ from . import roles as RL
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CALC = os.path.join(HERE, "calc")
+
+def child_pythonpath():
+    """계산 단계를 별도 프로세스로 띄울 때 넘길 PYTHONPATH.
+    계산 폴더 + 환경변수 PYTHONPATH + 지금 프로세스가 실제로 쓰는 import 경로(sys.path).
+    (Vercel 은 설치 패키지 경로를 환경변수가 아니라 실행 중에 sys.path 에 직접 넣을 수 있어서 둘 다 넘김)"""
+    parts = [CALC] + [p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p] + [p for p in sys.path if p and os.path.isdir(p)]
+    return os.pathsep.join(dict.fromkeys(parts))
+
 STEPS = [
     ("가동대상 정리", ["make_target.py"]),
     ("클로잇 SOLD 실적", ["make_perf2.py"]),
@@ -343,7 +351,7 @@ def _job(storage, label, user):
     try:
         cfg, warns, used, log = prepare(storage, label, user)
         inputs = cfg["inputs"]
-        env = dict(os.environ, GADONG_CFG=os.path.join(work, "cfg.json"), PYTHONPATH=os.pathsep.join(p for p in (CALC, os.environ.get("PYTHONPATH", "")) if p), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+        env = dict(os.environ, GADONG_CFG=os.path.join(work, "cfg.json"), PYTHONPATH=child_pythonpath(), PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
         for i, (name, cmd) in enumerate(STEPS, 1):
             _set(storage, label, step=f"{i}/{len(STEPS)} {name}")
             args = [sys.executable, os.path.join(CALC, cmd[0])] + [a.format(work=work) for a in cmd[1:]]

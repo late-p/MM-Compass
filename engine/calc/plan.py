@@ -281,6 +281,10 @@ def build():
             if x["name"] not in {v["name"] for v in people.values()}:
                 notes["unmatched"].append((SHORT[f], x["name"], x["team"], x["pjt"], round(sum(x["q"]), 2)))
     P = pd.DataFrame(new)
+    if P.empty:   # 읽힌 투입계획이 하나도 없음 → KeyError 대신 원인을 알려 줌
+        _names = ", ".join(sorted({str(SHORT[f]) for f in R})[:8])
+        raise RuntimeError("투입계획에서 가동대상 명단과 맞는 인원을 한 명도 읽지 못했습니다. 올린 투입계획 파일이 가동인력목록·SOLD와 같은 기준(같은 사람 이름)인지, "
+                           f"파일 양식이 맞는지 확인하세요. 읽은 투입계획: {_names or '없음'}")
     # ---- 규칙: SOLD에 해당 월 배정이 있으면 SOLD를 따른다 (사람·월 단위) ----
     sold_all = pd.concat([c, e], ignore_index=True); sold_all["_g"] = sold_all["그룹사번"].apply(gid)
     sold_over = []; add = []

@@ -88,7 +88,10 @@ def resolve_inputs(storage, label, exclude_id=None):
                                    orig=u["orig_name"], date=date, src=f"업로드 #{u['id']}", upload_id=u["id"], at=u["uploaded_at"])
     # 통계 파일보다 나중에 올라온 투입계획 → 당월 이후는 통계 대신 그 계획 기준
     stats_at = pick.get("stats", {}).get("at", BASE_STATS_AT)
-    fresh = [v["path"] for r, v in pick.items() if r.startswith("plan_") and v.get("at", "") > stats_at]
+    # 환경변수 GADONG_NOT_FRESH(쉼표로 자리 이름, 예: plan_ees,plan_msp,plan_dxp): 통계보다 나중에 올렸어도 '새 파일'로 보지 않을 자리
+    # (옛 기준 자료를 시연용으로 새로 올릴 때, 원래처럼 통계 기준으로 계산하게 하려는 용도. 비어 있으면 기존 동작 그대로)
+    not_fresh = {x.strip() for x in os.environ.get("GADONG_NOT_FRESH", "").split(",") if x.strip()}
+    fresh = [v["path"] for r, v in pick.items() if r.startswith("plan_") and r not in not_fresh and v.get("at", "") > stats_at]
     fresh += [d["path"] for d in dept_files.values() if d.get("at", "") > stats_at]
     inputs = {r: v["path"] for r, v in pick.items()}
     short = {r: v["short"] for r, v in pick.items() if v.get("short")}

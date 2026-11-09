@@ -20,9 +20,9 @@ def _qv(r, cols):
         try: q.append(float(v) if v not in (None, "", "-") else 0.0)
         except Exception: q.append(0.0)
     return q
-F_HB, F_EC, F_ES, F_AX = _cfg.inp("plan_hb"), _cfg.inp("plan_ec"), _cfg.inp("plan_es"), _cfg.inp("plan_ax")
-F_EES, F_EEM, F_MSP, F_DXP = _cfg.inp("plan_ees"), _cfg.inp("plan_eem"), _cfg.inp("plan_msp"), _cfg.inp("plan_dxp")
-F_HB2 = _cfg.inp("plan_hb2")   # 하반기 최신본 (MSP·플랫폼·DS)
+F_HB, F_EC, F_ES, F_AX = _cfg.IN.get("plan_hb", SP + "_absent_plan_hb.xlsx"), _cfg.IN.get("plan_ec", SP + "_absent_plan_ec.xlsx"), _cfg.IN.get("plan_es", SP + "_absent_plan_es.xlsx"), _cfg.IN.get("plan_ax", SP + "_absent_plan_ax.xlsx")
+F_EES, F_EEM, F_MSP, F_DXP = _cfg.IN.get("plan_ees", SP + "_absent_plan_ees.xlsx"), _cfg.IN.get("plan_eem", SP + "_absent_plan_eem.xlsx"), _cfg.IN.get("plan_msp", SP + "_absent_plan_msp.xlsx"), _cfg.IN.get("plan_dxp", SP + "_absent_plan_dxp.xlsx")
+F_HB2 = _cfg.IN.get("plan_hb2", SP + "_absent_plan_hb2.xlsx")   # 하반기 최신본 (MSP·플랫폼·DS)
 _SR = _cfg.SHORT
 SHORT = {F_HB: _SR.get("plan_hb", "하반기"), F_EC: _SR.get("plan_ec", "EC1·2사업부"), F_ES: _SR.get("plan_es", "ES사업부"), F_AX: _SR.get("plan_ax", "AX"),
          F_EES: _SR.get("plan_ees", "엔텍 ES"), F_EEM: _SR.get("plan_eem", "엔텍 EM"), F_MSP: _SR.get("plan_msp", "MSP 독자양식"),
@@ -201,6 +201,7 @@ def build():
         print("fresh.json 기록 실패", _e)
     PRESENT.clear(); PRESENT_X.clear()
     def _parse(f):
+        if not __import__("os").path.isfile(f): return []
         try:
             return ax_rows(f) if FMT.get(f) == "ax" else msp_rows(f) if FMT.get(f) == "msp" else platform_rows(f) if FMT.get(f) == "platform" else (platform_rows(f) + dxmsp_rows(f)) if FMT.get(f) == "dx" else rolling_rows(f)
         except Exception as ex:

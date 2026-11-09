@@ -66,8 +66,10 @@ def _old_cached(plan, path, fmt, work):
 def main(storage, uid):
     sys.path.insert(0, os.path.dirname(HERE))
     from engine import roles as RL, run as RUN
-    c = sqlite3.connect(os.path.join(storage, "gadong.db")); c.row_factory = sqlite3.Row
-    u = c.execute("SELECT * FROM uploads WHERE id=?", (uid,)).fetchone()
+    from gadong import db
+    c = db.connect(storage=storage)
+    try: u = c.execute("SELECT * FROM uploads WHERE id=?", (uid,)).fetchone()
+    finally: c.close()
     path = os.path.join(storage, "uploads", u["stored_name"])
     res = dict(id=uid, name=u["orig_name"], kind=u["kind"], at=dt.datetime.now().strftime("%Y-%m-%d %H:%M"), read=[], red=[], yellow=[], changes=[], note="")
     if u["kind"] != "plan":

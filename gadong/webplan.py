@@ -5,11 +5,13 @@
 import os, re, glob, json, datetime as dt, collections
 import pandas as pd, openpyxl
 
+from .files import latest_work_root
+
 M = list(range(1, 13))
 
 def latest_work(storage):
-    ws = sorted(l for l in os.listdir(os.path.join(storage, "work"))
-                if re.fullmatch(r"\d{4}-\d{2}-W\d", l) and os.path.exists(os.path.join(storage, "work", l, "use_clo_plan.pkl")))
+    ws = sorted(l for l in os.listdir(latest_work_root(storage))
+                if re.fullmatch(r"\d{4}-\d{2}-W\d", l) and os.path.exists(os.path.join(latest_work_root(storage), l, "use_clo_plan.pkl")))
     return ws[-1] if ws else None
 
 def _gid(x):
@@ -36,7 +38,7 @@ def load(storage, units, keys=None):
     tk = ORG.expand(storage, units)
     if keys is not None: tk = [k for k in tk if k in set(keys)]
     if not tk: return None, "이 범위에서 가동대상 인원이 있는 팀을 찾지 못했습니다. (하반기 총괄 등 전체 범위는 화면 입력 대신 파일로 올려 주세요)"
-    W = os.path.join(storage, "work", label)
+    W = os.path.join(latest_work_root(storage), label)
     from engine import roles as RL
     lb2, cur, roster = ORG.roster(storage)
     tkset = set(tk); roster = [x for x in roster if x["key"] in tkset]
@@ -128,7 +130,7 @@ def write_xlsx(path, dept, people, user):
 
 def _hr_info(storage, label):
     """그룹사번 → {사번, 직위, 직무} (계산 때 쓴 통합인사정보). 못 읽으면 빈 dict"""
-    p = os.path.join(storage, "work", label, "hr.xlsx")
+    p = os.path.join(latest_work_root(storage), label, "hr.xlsx")
     if not os.path.exists(p): return {}
     try:
         raw = pd.read_excel(p, header=None, nrows=8)

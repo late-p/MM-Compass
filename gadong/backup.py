@@ -47,6 +47,7 @@ def last_backup_time(app):
 
 def make_backup(app, reason="자동"):
     """백업 1개 만들기 → (성공 여부, 파일 이름 또는 오류)"""
+    if app.config.get("DATABASE_URL"): return False, "PostgreSQL 백업은 DB의 백업·내보내기 기능을 사용해 주세요."
     if not _lock.acquire(blocking=False): return False, "다른 백업이 진행 중입니다."
     try:
         st = app.config["STORAGE"]; d = backup_dir(app); os.makedirs(d, exist_ok=True)

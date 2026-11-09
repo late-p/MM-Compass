@@ -1,6 +1,10 @@
 {% extends "auth_base.html" %}{% block title %}MM-Compass · 로그인{% endblock %}
 {% block form %}
     <h1>로그인</h1>
+    {% if config.HOSTING_PREVIEW %}
+    <div class="lg-hint">서비스 오픈 준비 중입니다.</div>
+    <div class="lg-ok" role="status">MM-Compass 접속 화면입니다.<br>로그인·회원가입·자료 제출은 준비가 끝난 후 이용할 수 있습니다.</div>
+    {% else %}
     <div class="lg-hint">계정 정보를 입력하세요.</div>
     {% with m = get_flashed_messages() %}{% for x in m %}<div class="lg-flash">{{ x }}</div>{% endfor %}{% endwith %}
     <form method="post" autocomplete="on">
@@ -11,4 +15,5 @@
       <button class="primary">로그인</button>
     </form>
     <div class="lg-foot">계정이 없으신가요? <a href="{{ url_for('signup') }}">회원가입</a></div>
+    {% endif %}
   {% endblock %}

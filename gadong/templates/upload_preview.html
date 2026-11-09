@@ -9,7 +9,7 @@
 <h1>반영 미리보기</h1>
 <div class="sub"><a href="{{ url_for('upload') }}">← 업로드 목록</a> · {{ r['orig_name'] }} · {{ r['uploaded_at'] }} · {{ r['display'] }} · 주차 {{ r['week'] }}</div>
 <div class="card pv-head"><span class="st st-{{ css.get(r['status'],'sub') }}">{{ r['status'] }}</span><span class="muted">{{ help.get(r['status'],'') }}</span></div>
-{% if not pv %}<div class="card">{% if wait %}<meta http-equiv="refresh" content="5">미리보기를 만들고 있습니다… 큰 파일은 1~2분 걸립니다. 이 화면은 자동으로 새로고침됩니다. {% else %}미리보기가 아직 없습니다. {% endif %}<a class="btn" href="{{ url_for('upload_preview', uid=r['id'], make=1) }}">지금 만들기</a></div>
+{% if not pv %}<div class="card">{% if config.REMOTE_FILES %}<p data-preview-run="{{ url_for('preview_run', uid=r['id']) }}" data-csrf="{{ csrf_token() }}">미리보기를 만들고 있습니다…</p>{% elif wait %}<meta http-equiv="refresh" content="5">미리보기를 만들고 있습니다… 큰 파일은 1~2분 걸립니다. 이 화면은 자동으로 새로고침됩니다. {% else %}미리보기가 아직 없습니다. {% endif %}<a class="btn" href="{{ url_for('upload_preview', uid=r['id'], make=1) }}">지금 만들기</a></div>
 {% elif pv.error %}<div class="card pv-red"><h2>파일을 읽지 못했습니다</h2><p>{{ pv.error }}</p><p class="muted">이 상태로는 반영하지 마세요. 파일을 확인해 다시 올리거나 삭제해 주세요.</p></div>
 {% else %}
 <div class="card"><h2>읽은 내용</h2>

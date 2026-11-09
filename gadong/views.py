@@ -1,7 +1,7 @@
 import threading, os, json, uuid, zipfile, datetime as dt
 from flask import (render_template, request, redirect, url_for, abort, send_file, flash, g, current_app)
 from werkzeug.utils import secure_filename
-from . import db
+from . import db, files, jobs
 from .auth import login_required, check_csrf, hash_pw
 from .scope import user_depts, pick_dept, allowed, units_of, ALL, upload_options
 from . import org as ORG
@@ -37,6 +37,7 @@ def latest_published():
     return r
 
 def published_path(label, name):
+    if files.enabled(): return jobs.report_path(label, name, published=True)
     d = os.path.join(current_app.config["STORAGE"], "published", secure_filename(label))
     if os.path.exists(os.path.join(d, "RETIRED.txt")): return None
     p = os.path.join(d, name)
@@ -53,6 +54,8 @@ def validate_excel(fs):
         try:
             with zipfile.ZipFile(fs.stream) as z:
                 names = z.namelist()
+                if len(names) > 10000 or sum(item.file_size for item in z.infolist()) > 256 * 1024 * 1024:
+                    return "엑셀 내부 데이터가 너무 큽니다. 불필요한 시트·서식을 줄인 뒤 다시 올려 주세요."
                 if ext == ".xlsx" and any(n.lower().endswith("vbaproject.bin") for n in names): return "매크로가 포함된 파일은 받지 않습니다."
                 if "[Content_Types].xml" not in names: return "엑셀 파일 구조가 올바르지 않습니다."
         except zipfile.BadZipFile:
@@ -105,11 +108,15 @@ def make_preview(uid):
         pass
 
 def load_preview(uid):
+    if files.enabled():
+        row = db.get().execute("SELECT preview_json FROM uploads WHERE id=?", (uid,)).fetchone()
+        return json.loads(row["preview_json"]) if row and row["preview_json"] else None
     p = os.path.join(current_app.config["STORAGE"], "previews", f"{int(uid)}.json")
     try: return json.load(open(p, encoding="utf-8"))
     except Exception: return None
 
 def draft_path(label, name):
+    if files.enabled(): return jobs.report_path(label, name)
     d = os.path.join(current_app.config["STORAGE"], "drafts", secure_filename(label), name)
     return d if os.path.exists(d) else None
 
@@ -159,6 +166,7 @@ def safe_remove(path):
 
 def start_previews(ids):
     """여러 건의 미리보기를 뒤에서 차례로 만듦 (화면은 기다리지 않음)"""
+    if files.enabled(): return  # 미리보기 화면의 POST 요청이 실행한다.
     app_ = current_app._get_current_object()
     for i in ids:   # 지웠던 번호가 다시 쓰이면 옛 미리보기가 남아 있어 새 파일인 것처럼 보임 → 새로 만들기 전에 치움
         try: os.remove(os.path.join(current_app.config["STORAGE"], "previews", f"{int(i)}.json"))
@@ -180,11 +188,24 @@ def register_team_file(u, S, team, tmp_path, orig, wlabel, wtitle, note, status=
     path = os.path.join(S, "uploads", stored); shutil.move(tmp_path, path)
     place, perr = place_of("plan", team, path)
     if perr: safe_remove(path); return None, perr
+    ticket = getattr(g, "upload_ticket", None)
+    if ticket: ticket += ":" + __import__("hashlib").sha256(team.encode()).hexdigest()
+    uid = store_upload(u, team, "plan", wlabel, orig[:200], path, status, f"{note} · 자리: {place}", ticket)
     d = db.get()
-    d.execute("INSERT INTO uploads(user_id,dept,kind,week,orig_name,stored_name,size,status,note,uploaded_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-              (u["id"], team, "plan", wlabel, orig[:200], stored, os.path.getsize(path), status, f"{note} · 자리: {place}", db.now()))
-    d.execute("INSERT OR IGNORE INTO weeks(label,title) VALUES(?,?)", (wlabel, wtitle)); d.commit()
-    return d.execute("SELECT max(id) FROM uploads").fetchone()[0], None
+    d.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (wlabel, wtitle)); d.commit()
+    return uid, None
+
+def store_upload(user, dept, kind, week, name, path, status, note, ticket=None):
+    d = db.get()
+    if ticket:
+        existing = d.execute("SELECT id FROM uploads WHERE ticket_id=?", (ticket,)).fetchone()
+        if existing: safe_remove(path); return existing["id"]
+    files.persist(path)
+    row = d.execute("INSERT INTO uploads(user_id,dept,kind,week,orig_name,stored_name,size,status,note,uploaded_at,ticket_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(ticket_id) DO UPDATE SET ticket_id=excluded.ticket_id RETURNING id,stored_name",
+        (user["id"], dept, kind, week, name, os.path.basename(path), os.path.getsize(path), status, note, db.now(), ticket)).fetchone()
+    if row["stored_name"] != os.path.basename(path): files.delete("uploads/" + os.path.basename(path))
+    return row["id"]
 
 def split_register(u, S, path, fname, dept, wlabel, wtitle):
     """여러 팀이 섞인 인력롤링 파일 → 팀별로 나눠 각각 업로드로 등록 (담당 범위 안의 팀만)"""
@@ -211,6 +232,60 @@ def split_register(u, S, path, fname, dept, wlabel, wtitle):
     if unknown: msg += f" 담당 팀 밖이거나 가동인력목록에 없는 이름 {len(unknown)}명은 제외했습니다({', '.join(unknown[:4])}{' …' if len(unknown) > 4 else ''})."
     start_previews(ids)
     return ids, msg
+
+def receive_upload(u, fs, form):
+    is_admin = u["role"] == "admin"
+    kinds = KINDS_ADMIN if is_admin else KINDS_UPLOADER
+    wlabel, wtitle = week_of()
+    prev = week_of(dt.date.today() - dt.timedelta(days=7))
+    kind = form.get("kind", "plan")
+    if is_admin and form.get("week") == prev[0]: wlabel, wtitle = prev
+    dept = form.get("dept", "") if is_admin else form.get("dept", "")
+    if not is_admin:
+        if not allowed(u, dept): abort(403)
+        pick_dept(u, dept)
+    if kind not in kinds: abort(400)
+    if not fs or not fs.filename: flash("파일을 선택해 주세요."); return redirect(url_for("upload"))
+    err = validate_excel(fs)
+    if err: flash(err); db.audit(u["username"], "upload_reject", f"{fs.filename}: {err}"); return redirect(url_for("upload"))
+    ext = os.path.splitext(fs.filename)[1].lower()
+    stored = f"{dt.datetime.now():%Y%m%d%H%M%S}_{uuid.uuid4().hex[:8]}{'.xlsx' if ext == '.xlsm' else ext}"
+    path = os.path.join(current_app.config["STORAGE"], "uploads", stored)
+    if ext == ".xlsm":   # 매크로를 떼고 .xlsx로 보관
+        tmp = path + ".part"; fs.save(tmp)
+        try: strip_macros(tmp, path)
+        except Exception: flash("파일을 읽을 수 없습니다. 엑셀에서 '다른 이름으로 저장 → .xlsx'로 저장해 올려 주세요."); return redirect(url_for("upload"))
+        finally:
+            if os.path.exists(tmp): os.remove(tmp)
+    else: fs.save(path)
+    size = os.path.getsize(path)
+    split = kind == "plan" and (form.get("split") == "1" or should_split(path, dept) or is_team_template(path) or is_hq_rolling(path, dept))
+    if split and is_admin and dept and dept != ALL and not ORG.roster(current_app.config["STORAGE"])[2]:
+        split = False
+        flash("첫 계산 전에는 선택한 부서 파일로 접수합니다. 기준 인원이 계산된 다음부터 팀별 자동 분리를 사용할 수 있습니다.")
+    if split:
+        ids, info = split_register(u, current_app.config["STORAGE"], path, os.path.basename(fs.filename), dept, wlabel, wtitle)
+        safe_remove(path)
+        if not ids: flash(f"팀별로 나눌 수 없습니다: {info}"); return redirect(url_for("upload"))
+        flash(info)
+        return redirect(url_for("upload_batch", ids=",".join(map(str, ids))))
+    guessed = ""
+    if kind == "plan" and not dept:
+        from engine import roles as RL
+        dept = RL.infer_dept(fs.filename, RL.detect_format(path)) or ""
+        guessed = f" (부서 자동 인식: {dept})" if dept else ""
+    place, perr = place_of(kind, dept, path)
+    if perr:
+        safe_remove(path); flash(f"반영할 수 없는 파일입니다: {perr}"); db.audit(u["username"], "upload_reject", f"{fs.filename}: {perr}")
+        return redirect(url_for("upload"))
+    new_id = store_upload(u, dept, kind, wlabel, os.path.basename(fs.filename)[:200], path, "확인 대기", f"자리: {place}", getattr(g, "upload_ticket", None))
+    d = db.get()
+    d.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (wlabel, wtitle)); d.commit()
+    db.audit(u["username"], "upload", f"{kind} · {dept} · {fs.filename}")
+    start_previews([new_id])   # 미리보기는 뒤에서 만들고 화면은 바로 넘어감 (큰 파일도 멈추지 않음)
+    flash(f"업로드했습니다: {fs.filename} → {place}{guessed} · {wtitle}. 미리보기를 만들고 있습니다 (잠시 뒤 자동으로 나타납니다).")
+    return redirect(url_for("upload_preview", uid=new_id))
+
 
 def init_app(app):
     @app.route("/")
@@ -273,51 +348,7 @@ def init_app(app):
         week_opts = [(wlabel, wtitle + " (이번 주)"), (prev[0], prev[1] + " (지난주 · 월요일 회의 자료 수정용)")]
         if request.method == "POST":
             check_csrf()
-            fs = request.files.get("file"); kind = request.form.get("kind", "plan")
-            if is_admin and request.form.get("week") == prev[0]: wlabel, wtitle = prev
-            dept = request.form.get("dept", "") if is_admin else request.form.get("dept", "")
-            if not is_admin:
-                if not allowed(u, dept): abort(403)
-                pick_dept(u, dept)
-            if kind not in kinds: abort(400)
-            if not fs or not fs.filename: flash("파일을 선택해 주세요."); return redirect(url_for("upload"))
-            err = validate_excel(fs)
-            if err: flash(err); db.audit(u["username"], "upload_reject", f"{fs.filename}: {err}"); return redirect(url_for("upload"))
-            ext = os.path.splitext(fs.filename)[1].lower()
-            stored = f"{dt.datetime.now():%Y%m%d%H%M%S}_{uuid.uuid4().hex[:8]}{'.xlsx' if ext == '.xlsm' else ext}"
-            path = os.path.join(current_app.config["STORAGE"], "uploads", stored)
-            if ext == ".xlsm":   # 매크로를 떼고 .xlsx로 보관
-                tmp = path + ".part"; fs.save(tmp)
-                try: strip_macros(tmp, path)
-                except Exception: flash("파일을 읽을 수 없습니다. 엑셀에서 '다른 이름으로 저장 → .xlsx'로 저장해 올려 주세요."); return redirect(url_for("upload"))
-                finally:
-                    if os.path.exists(tmp): os.remove(tmp)
-            else: fs.save(path)
-            size = os.path.getsize(path)
-            if kind == "plan" and (request.form.get("split") == "1" or should_split(path, dept) or is_team_template(path) or is_hq_rolling(path, dept)):
-                ids, info = split_register(u, current_app.config["STORAGE"], path, os.path.basename(fs.filename), dept, wlabel, wtitle)
-                safe_remove(path)
-                if not ids: flash(f"팀별로 나눌 수 없습니다: {info}"); return redirect(url_for("upload"))
-                flash(info)
-                return redirect(url_for("upload_batch", ids=",".join(map(str, ids))))
-            guessed = ""
-            if kind == "plan" and not dept:
-                from engine import roles as RL
-                dept = RL.infer_dept(fs.filename, RL.detect_format(path)) or ""
-                guessed = f" (부서 자동 인식: {dept})" if dept else ""
-            place, perr = place_of(kind, dept, path)
-            if perr:
-                safe_remove(path); flash(f"반영할 수 없는 파일입니다: {perr}"); db.audit(u["username"], "upload_reject", f"{fs.filename}: {perr}")
-                return redirect(url_for("upload"))
-            d = db.get()
-            d.execute("INSERT INTO uploads(user_id,dept,kind,week,orig_name,stored_name,size,status,note,uploaded_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                      (u["id"], dept, kind, wlabel, os.path.basename(fs.filename)[:200], stored, size, "확인 대기", f"자리: {place}", db.now()))
-            d.execute("INSERT OR IGNORE INTO weeks(label,title) VALUES(?,?)", (wlabel, wtitle)); d.commit()
-            db.audit(u["username"], "upload", f"{kind} · {dept} · {fs.filename}")
-            new_id = d.execute("SELECT max(id) FROM uploads").fetchone()[0]
-            start_previews([new_id])   # 미리보기는 뒤에서 만들고 화면은 바로 넘어감 (큰 파일도 멈추지 않음)
-            flash(f"업로드했습니다: {fs.filename} → {place}{guessed} · {wtitle}. 미리보기를 만들고 있습니다 (잠시 뒤 자동으로 나타납니다).")
-            return redirect(url_for("upload_preview", uid=new_id))
+            return receive_upload(u, request.files.get("file"), request.form)
         d = db.get()
         q = ("SELECT up.*, us.display FROM uploads up LEFT JOIN users us ON us.id=up.user_id " +
              ("" if is_admin else "WHERE up.user_id=? ") + "ORDER BY up.id DESC LIMIT 200")
@@ -336,8 +367,10 @@ def init_app(app):
     def download(uid):
         r = db.get().execute("SELECT * FROM uploads WHERE id=?", (uid,)).fetchone()
         if not r: abort(404)
-        p = os.path.join(current_app.config["STORAGE"], "uploads", secure_filename(r["stored_name"]))
+        p = files.ensure("uploads/" + secure_filename(r["stored_name"]))
+        if not p: abort(404)
         db.audit(g.user["username"], "download", r["orig_name"])
+        if files.enabled(): return redirect(files.signed_download("uploads/" + r["stored_name"], r["orig_name"]))
         return send_file(p, as_attachment=True, download_name=r["orig_name"])
 
     @app.route("/upload/<int:uid>/preview")
@@ -348,7 +381,7 @@ def init_app(app):
         if g.user["role"] != "admin" and r["user_id"] != g.user["id"] and not allowed(g.user, r["dept"]): abort(403)
         pv = load_preview(uid)
         if pv and pv.get("changes") and "items" not in pv["changes"][0]: pv = None   # 예전 형식(프로젝트별 변화 없음) → 다시 만들기
-        if pv is None and request.args.get("make"): make_preview(uid); pv = load_preview(uid)
+        if pv is None and request.args.get("make") and not files.enabled(): make_preview(uid); pv = load_preview(uid)
         try: young = (dt.datetime.now() - dt.datetime.strptime(r["uploaded_at"], "%Y-%m-%d %H:%M:%S")).total_seconds() < 600
         except Exception: young = False
         return render_template("upload_preview.html", r=r, pv=pv, css=STATUS_CSS, help=STATUS_HELP, wait=(pv is None and young))
@@ -384,7 +417,7 @@ def init_app(app):
         if not r: abort(404)
         if g.user["role"] != "admin" and (r["user_id"] != g.user["id"] or r["status"] == "반영"): abort(403)
         p = os.path.join(current_app.config["STORAGE"], "uploads", secure_filename(r["stored_name"]))
-        if os.path.exists(p): os.remove(p)
+        files.delete("uploads/" + secure_filename(r["stored_name"]))
         d.execute("DELETE FROM uploads WHERE id=?", (uid,)); d.commit()
         try: os.remove(os.path.join(current_app.config["STORAGE"], "previews", f"{int(uid)}.json"))
         except OSError: pass
@@ -402,7 +435,13 @@ def init_app(app):
         db.get().execute("UPDATE uploads SET status=?, note=? WHERE id=?", (st, request.form.get("note", "")[:300], uid))
         wk = request.form.get("week", "")
         import re as _re
-        if _re.fullmatch(r"\d{4}-\d{2}-W\d", wk): db.get().execute("UPDATE uploads SET week=? WHERE id=?", (wk, uid))
+        if wk:
+            if not _re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])-W[1-5]", wk): abort(400)
+            from engine.run import week_meta
+            meta = week_meta(wk)
+            if meta["thu"][5:7] != wk[5:7]: abort(400)
+            db.get().execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (wk, meta["title"]))
+            db.get().execute("UPDATE uploads SET week=? WHERE id=?", (wk, uid))
         db.get().commit()
         db.audit(g.user["username"], "upload_status", f"{uid} → {st}")
         return redirect(url_for("upload"))
@@ -418,9 +457,14 @@ def init_app(app):
             label = request.form.get("label", ""); act = request.form.get("act")
             if act == "new": label = week_of()[0]
             if act in ("rebuild", "new"):
-                ok, msg = engine_run.rebuild(st, label, g.user["username"])
-                if ok: d.execute("INSERT OR IGNORE INTO weeks(label,title) VALUES(?,?)", (label, engine_run.week_meta(label)["title"]))
+                ok, msg = jobs.start(label, g.user["username"]) if files.enabled() else engine_run.rebuild(st, label, g.user["username"])
+                if ok: d.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (label, engine_run.week_meta(label)["title"]))
                 flash(msg)
+            elif act == "cancel" and files.enabled():
+                jobs.cancel(label); flash("계산을 취소했습니다. 다시 재계산할 수 있습니다.")
+            elif act == "publish_draft" and files.enabled():
+                try: jobs.publish(label); flash(f"{label} 계산본을 게시했습니다.")
+                except ValueError as error: flash(str(error))
             elif act == "publish_draft":
                 src = os.path.join(st, "drafts", secure_filename(label)); dst = os.path.join(st, "published", secure_filename(label))
                 if not draft_path(label, "meeting.html"): flash("게시할 계산본이 없습니다.")
@@ -430,7 +474,7 @@ def init_app(app):
                     for f in ("admin.html", "meeting.html", "checks.json", "inputs.json", "summary.json"):
                         if os.path.exists(os.path.join(src, f)): shutil.copy(os.path.join(src, f), os.path.join(dst, f))
                     if os.path.exists(os.path.join(dst, "RETIRED.txt")): os.remove(os.path.join(dst, "RETIRED.txt"))
-                    d.execute("INSERT OR IGNORE INTO weeks(label,title) VALUES(?,?)", (label, engine_run.week_meta(label)["title"]))
+                    d.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (label, engine_run.week_meta(label)["title"]))
                     d.execute("UPDATE weeks SET published=1, published_at=? WHERE label=?", (db.now(), label))
                     try:
                         used = json.load(open(os.path.join(dst, "inputs.json"), encoding="utf-8"))["used"]
@@ -458,7 +502,8 @@ def init_app(app):
         rows = d.execute("SELECT * FROM weeks ORDER BY label DESC").fetchall()
         info = {}
         for r in rows:
-            L = r["label"]; s_ = engine_run.read_status(st, L) or {}
+            L = r["label"]
+            s_ = jobs.status(L) if files.enabled() else (engine_run.read_status(st, L) or {})
             ck = {}
             try: ck = json.load(open(draft_path(L, "checks.json"), encoding="utf-8"))
             except Exception: pass
@@ -476,13 +521,13 @@ def init_app(app):
     def week_detail(label):
         from engine import run as engine_run
         st = current_app.config["STORAGE"]; L = secure_filename(label)
-        s_ = engine_run.read_status(st, L) or {}
+        s_ = jobs.status(L) if files.enabled() else (engine_run.read_status(st, L) or {})
         ck, inp = {}, {}
         try: ck = json.load(open(draft_path(L, "checks.json"), encoding="utf-8"))
         except Exception: pass
         try: inp = json.load(open(draft_path(L, "inputs.json"), encoding="utf-8"))
         except Exception: pass
-        log = ""
+        log = s_.get("log", "") if files.enabled() else ""
         lp = os.path.join(st, "work", L, "log.txt")
         if s_.get("state") == "error" and os.path.exists(lp): log = open(lp, encoding="utf-8").read()[-6000:]
         return render_template("week_detail.html", label=L, st=s_, ck=ck, inp=inp, log=log, draft=bool(draft_path(L, "meeting.html")), meta=engine_run.week_meta(L))
@@ -512,7 +557,7 @@ def init_app(app):
                         d.execute("INSERT INTO users(username,display,pw_hash,role,dept,created_at) VALUES(?,?,?,?,?,?)",
                                   (un, request.form.get("display", un).strip() or un, hash_pw(pw), role, dept if role == "uploader" else "", db.now()))
                         d.execute("UPDATE users SET email=? WHERE username=?", (request.form.get("email", "").strip(), un)); d.commit(); flash(f"{un} 계정을 만들었습니다."); db.audit(g.user["username"], "user_create", f"{un} ({role})")
-                    except Exception: flash("이미 있는 아이디입니다.")
+                    except Exception: d.rollback(); flash("이미 있는 아이디입니다.")
             elif act == "setemail":
                 em = request.form.get("email", "").strip()
                 if em and ("@" not in em or " " in em): flash("메일 주소 형식을 확인해 주세요.")

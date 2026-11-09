@@ -33,12 +33,14 @@ def week_meta(label):
     return dict(label=label, title=f"{y}년 {m}월 {w}주차", short=f"{m}월 {w}주차", meet=f"{mon:%m.%d}({wd}) 회의", thu=thu.isoformat())
 
 def _db(storage):
-    c = sqlite3.connect(os.path.join(storage, "gadong.db")); c.row_factory = sqlite3.Row; return c
+    from gadong import db
+    return db.connect(storage=storage)
 
 def resolve_inputs(storage, label, exclude_id=None):
     """자리별 입력 파일 → (inputs, short, dept_files, files목록, used목록, 경고)"""
     base_dir = os.path.join(storage, "inputs", "base")
-    base = json.load(open(os.path.join(base_dir, "base.json"), encoding="utf-8"))
+    bp = os.path.join(base_dir, "base.json")
+    base = json.load(open(bp, encoding="utf-8")) if os.path.exists(bp) else {}
     pick = {r: dict(path=os.path.join(base_dir, v["file"]), orig=v["orig"], date=v["date"], short=v.get("short"), src="기본", at=v.get("at", "")) for r, v in base.items() if not r.startswith("_")}
     dept_files = {}; warns = []
     for d in base.get("_dept", []):   # 기본 자료에 포함된 부서 투입계획 (팀원 전달용 등 — 업로드가 없는 새 설치에서도 같은 계산이 되게)
@@ -50,6 +52,11 @@ def resolve_inputs(storage, label, exclude_id=None):
         ups = c.execute("SELECT * FROM uploads WHERE status='반영' AND week<=? AND id<>? ORDER BY id", (label, exclude_id or -1)).fetchall()
     for u in ups:
         path = os.path.join(storage, "uploads", u["stored_name"])
+        if not os.path.exists(path):
+            from flask import has_app_context
+            if has_app_context():
+                from gadong import files as _files
+                if _files.enabled(): _files.ensure("uploads/" + u["stored_name"], storage)
         if not os.path.exists(path): warns.append(f"업로드 원본 없음: {u['orig_name']}"); continue
         fmt = RL.detect_format(path) if u["kind"] == "plan" else None
         dept = u["dept"] or (RL.infer_dept(u["orig_name"], fmt) if u["kind"] == "plan" else "") or ""
@@ -82,6 +89,8 @@ def resolve_inputs(storage, label, exclude_id=None):
     files = [(v["date"], v["orig"], RL.ROLES[r][1]) for r, v in pick.items() if r not in ("plan_msp", "plan_dxp", "stats_base", "cp")]
     files += [(d["date"], d["orig"], f"10~12월 투입계획 · {d['label'].rsplit('(', 1)[0]} (부서 파일 우선)") for d in dept_files.values()]
     files.sort(key=lambda x: x[0], reverse=True)
+    missing_plans = [RL.ROLES[r][0] for r in RL.ROLES if r.startswith("plan_") and r not in inputs]
+    warns += ["투입계획 없음 (총괄·부서 파일로 대체하거나 0으로 계산): " + name for name in missing_plans]
     return inputs, short, list(dept_files.values()), files, used, warns, fresh
 
 def _month_text(t, cur, act):
@@ -199,7 +208,7 @@ def _hr_notes(storage):
     """사이트 '인사 변동 제출' 중 계산에 넣을 것: 반영 상태 + 관리자가 직접 입력한 것(인사자료와 다름 제외)"""
     try:
         import sqlite3
-        c = sqlite3.connect(os.path.join(storage, "gadong.db")); c.row_factory = sqlite3.Row
+        c = _db(storage)
         rows = c.execute("SELECT h.id,h.dept,h.name,h.sabun,h.kind,h.date,h.to_org,h.memo,h.status,u.role FROM hr_notes h LEFT JOIN users u ON u.id=h.user_id "
                          "WHERE h.status='반영' OR (u.role='admin' AND h.status IN ('접수','확인')) ORDER BY h.date, h.id").fetchall()
         c.close()
@@ -215,44 +224,101 @@ def _hr_notes(storage):
         pass
     return out
 
+def prepare(storage, label, user):
+    work = os.path.join(storage, "work", label) + os.sep
+    os.makedirs(work, exist_ok=True)
+    os.makedirs(os.path.join(storage, "published"), exist_ok=True)
+    log = []
+    meta = week_meta(label)
+    inputs, short, dept_files, files, used, warns, fresh = resolve_inputs(storage, label)
+    asof = dt.date.today().strftime("%m.%d")   # 계산한 날
+    meta["asof"] = asof
+    # 비교 기준: 같은 달의 직전 게시 주차가 있으면 전주, 없으면(월 첫 보고) 전월 확정
+    pub = os.path.join(storage, "published")
+    prevs = sorted(l for l in os.listdir(pub) if l < label and l[:7] == label[:7] and os.path.exists(os.path.join(pub, l, "summary.json"))
+                   and not os.path.exists(os.path.join(pub, l, "RETIRED.txt")))
+    if prevs:
+        meta["prev_summary"] = os.path.join(pub, prevs[-1], "summary.json"); meta["prev_label"] = prevs[-1]
+    else:   # 월 첫 보고: 전월이 SOLD 마감 전이면 전월 마지막 게시 주차와 비교 (확정이면 전월 실적과 비교)
+        y, m = int(label[:4]), int(label[5:7]); pl = f"{y - 1}-12" if m == 1 else f"{y}-{m - 1:02d}"
+        pms = sorted(l for l in os.listdir(pub) if l[:7] == pl and os.path.exists(os.path.join(pub, l, "summary.json"))
+                     and not os.path.exists(os.path.join(pub, l, "RETIRED.txt")))
+        if pms: meta["pm_label"] = pms[-1]; meta["pm_summary_path"] = os.path.join(pub, pms[-1], "summary.json")
+    for f in os.listdir(work):
+        if f != "status.json":
+            fp = os.path.join(work, f)
+            if os.path.isfile(fp): os.remove(fp)
+    required = ["hr", "sold_clo", "sold_et", "target_clo", "target_et", "stats", "stats_base", "cp"]
+    missing = [RL.ROLES[r][0] for r in required if r not in inputs or not os.path.isfile(inputs[r])]
+    if missing: raise ValueError("필수 입력 자료가 없습니다: " + ", ".join(missing) + ". 업로드 후 반영 확정해 주세요.")
+    if not any(r.startswith("plan_") for r in inputs) and not dept_files:
+        raise ValueError("반영 확정된 투입계획이 없습니다. 총괄 또는 부서 투입계획을 올려 주세요.")
+    _prep_hr(inputs["hr"], work)
+    baseline = os.path.join(storage, "inputs", "base", "_stats21.pkl")
+    if os.path.isfile(baseline): shutil.copy(baseline, os.path.join(work, "stats21.pkl"))
+    else:
+        import pandas as pd
+        raw = pd.read_excel(inputs["stats_base"], sheet_name="2-1. 통계(조직별_월별현황)", header=None)
+        rows = []; division = ""
+        for _, row in raw.iterrows():
+            if len(row) < 17: continue
+            if pd.notna(row[2]): division = str(row[2])
+            if row[4] in ("Sold", "제안", "R&D/과제"):
+                rows.append(dict(dv=division, k=row[4], **{f"m{m}": float(pd.to_numeric(row[4+m], errors="coerce") or 0) if pd.notna(row[4+m]) else 0.0 for m in range(1, 13)}))
+        pd.DataFrame(rows, columns=["dv", "k"] + [f"m{m}" for m in range(1, 13)]).to_pickle(os.path.join(work, "stats21.pkl"))
+    cur = int(label[5:7])
+    act = {k: sold_act(inputs[f"sold_{k}"], cur) for k in ("clo", "et")}
+    meta["act"] = act
+    meta["stats_date"] = next((u["date"] for u in used if u["role"] == "stats"), "")
+    if meta.get("pm_summary_path") and min(act.values()) < cur - 1: meta["pm_summary"] = meta["pm_summary_path"]   # 전월 잠정일 때만
+    files = [(d_, o_, _month_text(u_, cur, min(act.values()))) for d_, o_, u_ in files]
+    log.append(f"## 월 기준\n당월 {cur}월 · SOLD 실적 확정 아이티센클로잇 {act['clo']}월 · 아이티센엔텍 {act['et']}월")
+    try: targets = json.load(open(os.path.join(storage, "targets.json"), encoding="utf-8"))
+    except Exception: targets = {}
+    hr_notes = _hr_notes(storage)
+    cfg = dict(work=work, inputs=inputs, short=short, dept_files=dept_files, files=files, week=meta, fresh=fresh, act=act, targets=targets, hr_notes=hr_notes)
+    json.dump(cfg, open(os.path.join(work, "cfg.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    return cfg, warns, used, log
+
+
+def finish(storage, label, user, cfg, warns, used):
+    work = cfg["work"]
+    draft = os.path.join(storage, "drafts", label)
+    meta = cfg["week"]; asof = meta["asof"]
+    dept_files = cfg["dept_files"]; inputs = cfg["inputs"]; fresh = cfg["fresh"]; act = cfg["act"]
+    cur = int(label[5:7])
+    # 결과 정리 → drafts
+    os.makedirs(draft, exist_ok=True)
+    a = open(work + "admin.html", encoding="utf-8").read()
+    a = a.replace("10월 2주차 (10.08)", f"{meta['short']} ({asof})")   # (예전 고정 문구 대비 — 지금은 화면에서 직접 주차를 씀)
+    a = _strip_comments(a)
+    _ca = "<script>" + open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "colalign.js"), encoding="utf-8").read() + "</script>"   # 월 열 맞춤
+    def _inj(h): return h.replace("</body>", _ca + "</body>", 1) if "</body>" in h else h + _ca
+    open(os.path.join(draft, "admin.html"), "w", encoding="utf-8").write(_inj(a))
+    open(os.path.join(draft, "meeting.html"), "w", encoding="utf-8").write(_inj(open(work + "meeting.html", encoding="utf-8").read()))
+    if os.path.exists(work + "summary.json"): shutil.copy(work + "summary.json", os.path.join(draft, "summary.json"))
+    checks = json.load(open(work + "checks.json", encoding="utf-8")) if os.path.exists(work + "checks.json") else {}
+    try: _ov = json.load(open(work + "summary.json", encoding="utf-8")).get("over", [])
+    except Exception: _ov = []
+    checks["warn"] = list(warns) + [f"⚠ 100% 초과 — {x}" for x in _ov]
+    fr_ids = {d.get("upload_id") for d in dept_files if d["path"] in fresh}
+    fr_ids |= {u.get("upload_id") for u in used if u["role"] in inputs and inputs[u["role"]] in fresh}
+    checks["info"] = sorted({f"{u['orig']} ({u['src']}) — 통계 파일보다 나중에 올라와 통계 추정 구간은 이 파일 기준" for u in used if u.get("upload_id") in fr_ids - {None}})
+    if min(act.values()) < cur - 1:
+        checks["info"].insert(0, f"{', '.join(f'{m}월' for m in range(min(act.values()) + 1, cur))} SOLD 실적이 아직 마감 전 → 투입계획 기준 잠정 (SOLD투입MM목록을 새로 올리면 실적으로 바뀝니다)")
+    checks["idle"] = [_idle_text(x) for x in checks.get("idle", [])]
+    checks["plan"] = [[str(v).replace(" ((직속))", "").replace("((직속))", "") for v in x] for x in checks.get("plan", [])]
+    json.dump(checks, open(os.path.join(draft, "checks.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump(dict(meta=meta, used=used, by=user, at=dt.datetime.now().strftime("%Y-%m-%d %H:%M")), open(os.path.join(draft, "inputs.json"), "w", encoding="utf-8"), ensure_ascii=False)
+
+
 def _job(storage, label, user):
     work = os.path.join(storage, "work", label) + os.sep
     draft = os.path.join(storage, "drafts", label)
     log = []
     try:
-        meta = week_meta(label)
-        inputs, short, dept_files, files, used, warns, fresh = resolve_inputs(storage, label)
-        asof = dt.date.today().strftime("%m.%d")   # 계산한 날
-        meta["asof"] = asof
-        # 비교 기준: 같은 달의 직전 게시 주차가 있으면 전주, 없으면(월 첫 보고) 전월 확정
-        pub = os.path.join(storage, "published")
-        prevs = sorted(l for l in os.listdir(pub) if l < label and l[:7] == label[:7] and os.path.exists(os.path.join(pub, l, "summary.json"))
-                       and not os.path.exists(os.path.join(pub, l, "RETIRED.txt")))
-        if prevs:
-            meta["prev_summary"] = os.path.join(pub, prevs[-1], "summary.json"); meta["prev_label"] = prevs[-1]
-        else:   # 월 첫 보고: 전월이 SOLD 마감 전이면 전월 마지막 게시 주차와 비교 (확정이면 전월 실적과 비교)
-            y, m = int(label[:4]), int(label[5:7]); pl = f"{y - 1}-12" if m == 1 else f"{y}-{m - 1:02d}"
-            pms = sorted(l for l in os.listdir(pub) if l[:7] == pl and os.path.exists(os.path.join(pub, l, "summary.json"))
-                         and not os.path.exists(os.path.join(pub, l, "RETIRED.txt")))
-            if pms: meta["pm_label"] = pms[-1]; meta["pm_summary_path"] = os.path.join(pub, pms[-1], "summary.json")
-        for f in os.listdir(work):
-            if f != "status.json":
-                fp = os.path.join(work, f)
-                if os.path.isfile(fp): os.remove(fp)
-        _prep_hr(inputs["hr"], work)
-        shutil.copy(os.path.join(storage, "inputs", "base", "_stats21.pkl"), os.path.join(work, "stats21.pkl"))
-        cur = int(label[5:7])
-        act = {k: sold_act(inputs[f"sold_{k}"], cur) for k in ("clo", "et")}
-        meta["act"] = act
-        meta["stats_date"] = next((u["date"] for u in used if u["role"] == "stats"), "")
-        if meta.get("pm_summary_path") and min(act.values()) < cur - 1: meta["pm_summary"] = meta["pm_summary_path"]   # 전월 잠정일 때만
-        files = [(d_, o_, _month_text(u_, cur, min(act.values()))) for d_, o_, u_ in files]
-        log.append(f"## 월 기준\n당월 {cur}월 · SOLD 실적 확정 아이티센클로잇 {act['clo']}월 · 아이티센엔텍 {act['et']}월")
-        try: targets = json.load(open(os.path.join(storage, "targets.json"), encoding="utf-8"))
-        except Exception: targets = {}
-        hr_notes = _hr_notes(storage)
-        cfg = dict(work=work, inputs=inputs, short=short, dept_files=dept_files, files=files, week=meta, fresh=fresh, act=act, targets=targets, hr_notes=hr_notes)
-        json.dump(cfg, open(os.path.join(work, "cfg.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        cfg, warns, used, log = prepare(storage, label, user)
+        inputs = cfg["inputs"]
         env = dict(os.environ, GADONG_CFG=os.path.join(work, "cfg.json"), PYTHONPATH=CALC, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
         for i, (name, cmd) in enumerate(STEPS, 1):
             _set(storage, label, step=f"{i}/{len(STEPS)} {name}")
@@ -261,29 +327,7 @@ def _job(storage, label, user):
             log.append(f"## {i}. {name}\n{r.stdout[-3000:]}\n{r.stderr[-6000:]}")
             if r.returncode != 0:
                 raise StepError(name, cmd[0], r.stderr, inputs, used)
-        # 결과 정리 → drafts
-        os.makedirs(draft, exist_ok=True)
-        a = open(work + "admin.html", encoding="utf-8").read()
-        a = a.replace("10월 2주차 (10.08)", f"{meta['short']} ({asof})")   # (예전 고정 문구 대비 — 지금은 화면에서 직접 주차를 씀)
-        a = _strip_comments(a)
-        _ca = "<script>" + open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "colalign.js"), encoding="utf-8").read() + "</script>"   # 월 열 맞춤
-        def _inj(h): return h.replace("</body>", _ca + "</body>", 1) if "</body>" in h else h + _ca
-        open(os.path.join(draft, "admin.html"), "w", encoding="utf-8").write(_inj(a))
-        open(os.path.join(draft, "meeting.html"), "w", encoding="utf-8").write(_inj(open(work + "meeting.html", encoding="utf-8").read()))
-        if os.path.exists(work + "summary.json"): shutil.copy(work + "summary.json", os.path.join(draft, "summary.json"))
-        checks = json.load(open(work + "checks.json", encoding="utf-8")) if os.path.exists(work + "checks.json") else {}
-        try: _ov = json.load(open(work + "summary.json", encoding="utf-8")).get("over", [])
-        except Exception: _ov = []
-        checks["warn"] = list(warns) + [f"⚠ 100% 초과 — {x}" for x in _ov]
-        fr_ids = {d.get("upload_id") for d in dept_files if d["path"] in fresh}
-        fr_ids |= {u.get("upload_id") for u in used if u["role"] in inputs and inputs[u["role"]] in fresh}
-        checks["info"] = sorted({f"{u['orig']} ({u['src']}) — 통계 파일보다 나중에 올라와 통계 추정 구간은 이 파일 기준" for u in used if u.get("upload_id") in fr_ids - {None}})
-        if min(act.values()) < cur - 1:
-            checks["info"].insert(0, f"{', '.join(f'{m}월' for m in range(min(act.values()) + 1, cur))} SOLD 실적이 아직 마감 전 → 투입계획 기준 잠정 (SOLD투입MM목록을 새로 올리면 실적으로 바뀝니다)")
-        checks["idle"] = [_idle_text(x) for x in checks.get("idle", [])]
-        checks["plan"] = [[str(v).replace(" ((직속))", "").replace("((직속))", "") for v in x] for x in checks.get("plan", [])]
-        json.dump(checks, open(os.path.join(draft, "checks.json"), "w", encoding="utf-8"), ensure_ascii=False)
-        json.dump(dict(meta=meta, used=used, by=user, at=dt.datetime.now().strftime("%Y-%m-%d %H:%M")), open(os.path.join(draft, "inputs.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        finish(storage, label, user, cfg, warns, used)
         _set(storage, label, state="done", step="완료", finished=dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), msg="")
     except StepError as e:
         log.append(traceback.format_exc())

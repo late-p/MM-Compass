@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block title %}MM-Compass · {{ meta.title }}{% endblock %}{% block body %}
 <h1>{{ meta.title }} <span class="muted" style="font-size:14px">{{ label }} · {{ meta.meet }}</span></h1>
+{% if config.REMOTE_FILES and st.state=='running' %}<div class="card"><p data-job-run="{{ url_for('advance_job', label=label) }}" data-csrf="{{ csrf_token() }}">{{ st.step }}</p>이 화면을 열어 두면 계산이 이어집니다.</div>{% endif %}
 <div class="sub"><a href="{{ url_for('weeks') }}">← 주차 목록</a>{% if draft %} · 새 계산본: <a href="{{ url_for('admin_draft', label=label, page='meeting.html') }}" target="_blank">회의용</a> · <a href="{{ url_for('admin_draft', label=label, page='admin.html') }}" target="_blank">관리자</a>{% endif %}
 {% if inp %} · 계산 {{ inp.at }} ({{ inp.by }}){% endif %}</div>
 {% if st.state == 'error' %}<div class="card pv-red"><h2>재계산이 멈췄습니다</h2>

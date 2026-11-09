@@ -37,7 +37,8 @@ def mail_conf():
     except Exception: return {}
 
 def ensure_schema(app):
-    with sqlite3.connect(app.config["DB_PATH"]) as c:
+    if app.config.get("DATABASE_URL"): return
+    with db.transaction(app) as c:
         cols = [r[1] for r in c.execute("PRAGMA table_info(users)")]
         if "email" not in cols: c.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
         c.executescript("""CREATE TABLE IF NOT EXISTS mail_log(

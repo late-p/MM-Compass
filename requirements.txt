@@ -2,3 +2,5 @@ flask>=3.0
 pandas>=2.0
 openpyxl>=3.1
 xlrd
+python-dotenv>=1.0,<2.0
+psycopg[binary]>=3.2,<4.0

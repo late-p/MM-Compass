@@ -1,7 +1,51 @@
 # 가동ON 사이트 (1단계 · 뼈대)
 
+## 로컬 개발 (macOS/Linux)
+Python **3.12**를 사용합니다. Node.js 프로젝트가 아니므로 기본 실행 명령은 `python app.py`입니다.
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+- 프로젝트 루트의 `.env`에 환경변수를 입력합니다. 파일이 없으면 `.env.example`을 `.env`로 복사하고 `SECRET_KEY`에 `.venv/bin/python -c "import secrets; print(secrets.token_hex(32))"`로 생성한 값을 넣습니다.
+- 앱과 `manage.py`는 `.env`를 자동으로 읽습니다. 실행 환경에 이미 있는 변수는 우선하며, `SECRET_KEY`가 비어 있으면 기존 `storage/secret.key`를 사용합니다.
+- `.env`의 `DATABASE_URL`이 있으면 **PostgreSQL**, 비어 있으면 기존 **SQLite**를 사용합니다. DB 값만 입력하고 자동으로 기존 SQLite 데이터를 옮기지는 않습니다.
+- PostgreSQL 최초 설정: `.venv/bin/python manage.py migrate`로 테이블을 만들고, `.venv/bin/python manage.py init`로 관리자 계정을 만듭니다. 비밀번호는 화면에 표시되지 않는 입력으로 받습니다.
+- `GADONG_HOSTING_PREVIEW=0`으로 두면 로컬 앱이 열립니다. `1`이면 온라인과 같은 접속 안내 화면만 표시됩니다.
+- 처음에는 `.venv/bin/python manage.py init`로 관리자 계정을 만듭니다. 기존 `storage`를 복원했다면 그 계정을 사용합니다.
+- 실행: `.venv/bin/python app.py` → **http://127.0.0.1:8800**. 종료는 `Ctrl+C`입니다.
+- 기존 자료가 없으면 리포트는 비어 있습니다. 실제 재계산에는 필요한 엑셀을 업로드하고 반영 확정하거나, 기존 기본 자료를 저장소로 옮겨야 합니다.
+- `.env`는 Git과 Vercel 업로드에서 제외됩니다. Vercel의 환경변수는 대시보드에 별도로 등록합니다.
+
+## Vercel 호스팅과 Supabase 연결
+- Python **3.12** 사용 (`.python-version`). 현재 코드 일부는 Python 3.11에서 문법 오류가 납니다.
+- Vercel의 **Flask** 프리셋이 루트 `app.py`를 실행합니다. Root Directory는 저장소 루트이며, Build Command는 `vercel.json`의 `python scripts/prepare_vercel.py`를 사용합니다. 이전 `api/index.py` 설정은 사용하지 않습니다.
+- 빌드 시 `gadong/static`을 `public/static`으로 복사해 기존 `/static/...` 주소로 CSS·아이콘을 제공합니다.
+- Vercel에 `DATABASE_URL`과 `SECRET_KEY`가 설정되어 있으면 실제 로그인·회원가입·계정 관리·인사 변동 제출을 제공합니다. `DATABASE_URL`이 없으면 접속 안내 화면을 제공합니다.
+- `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_STORAGE_BUCKET`이 설정되면 원본·계산 중간 결과·계산본을 **비공개 Supabase Storage**에 저장합니다. 이 설정은 로컬에서도 같은 저장소를 사용합니다.
+- 20MB 이하 엑셀을 브라우저에서 서명된 임시 주소로 직접 전송한 뒤 서버에서 크기·양식·권한을 다시 확인합니다. Vercel의 4.5MB 요청 제한을 거치지 않습니다. 업로드 완료 재시도는 접수 번호로 중복 등록을 방지합니다.
+- 파일 다운로드는 권한 확인 뒤 60초짜리 다운로드 주소를 발급합니다. 저장소는 공개하지 않습니다.
+- 재계산은 **입력 준비 → 기존 엔진 8단계 → 결과 저장**으로 나누며 요청 하나에 한 단계만 실행합니다. 완료한 단계와 파일은 DB·저장소에 남습니다. **주차 목록 또는 주차 상세 화면을 열어 두면 다음 단계가 자동 실행**되며, 창을 닫으면 현재 단계 이후는 화면을 다시 열 때 이어집니다.
+- 동시에 하나의 계산만 시작할 수 있고 실행 임대·토큰으로 중복 요청을 막습니다. Vercel 실행 지역은 서울(`icn1`), 함수 최대 실행 시간은 무료 플랜 한도인 300초이며 계산 스크립트는 단계당 220초로 제한합니다. 계산 중단 시 완료한 체크포인트에서 재개하고, 계산 오류·취소 중에도 기존 게시본은 유지합니다.
+- 관리자가 점검 후 `계산본 게시`를 누르면 완성된 결과를 가리키는 DB 포인터를 한 번에 전환합니다. 새 계산을 시작하거나 미리보기만 해서는 회의용 화면이 바뀌지 않습니다.
+- 기존 `storage/inputs/base` 백업 없이도 반영 확정한 업로드로 계산할 수 있습니다. SOLD·가동인력목록은 법인별로 각각, 통합인사정보·통계·CP·투입계획이 필요합니다. 누락은 계산 오류 화면에 표시합니다. 없는 부서 투입계획은 총괄·부서 파일로 대체하거나 0으로 계산하며 점검 목록에 남깁니다.
+- 파일은 크기·SHA-256으로 검증합니다. 큰 중간 결과는 분할 저장하고 직전 완성본과 동일한 파일은 재사용합니다. 서버의 주차·마감 시각은 한국 시간입니다.
+- Vercel 임시 디스크는 복구 가능한 캐시·계산 작업 공간으로만 사용합니다. 계정·업무 기록·계산 상태는 PostgreSQL, 파일은 비공개 저장소에 보관합니다. SQLite와 자동 백업 스레드는 시작하지 않습니다.
+- `/healthz`는 실제 DB에 조회한 후 `mode: postgres`, `database_connected: true`를 반환합니다. 접속 안내 모드에서는 `database_connected: false`입니다.
+- 로컬에서 동일한 화면 확인: `GADONG_HOSTING_PREVIEW=1 .venv/bin/python app.py` (macOS/Linux). 기존 로컬 운영은 이 환경변수 없이 실행합니다.
+- 배포: `npx vercel login` → `npx vercel deploy --prod`. 기존 프로젝트가 있다면 먼저 `npx vercel link`로 **MM-Compass 프로젝트를 선택**합니다.
+- 현재 환경에서는 임시 배포가 허용되지 않아 Vercel CLI 로그인이 필요합니다.
+- `storage/`, 환경변수·비밀키·엑셀·백업 등 운영 자료는 배포에서 제외합니다. 현재 체크아웃에는 운영 데이터가 없습니다.
+- 검증: `.venv/bin/python -m unittest discover -s tests -v`. 실제 PostgreSQL 로그인·잠금·권한·회원가입 및 저장소·업로드·계산·게시 검증은 `GADONG_TEST_POSTGRES=1 .venv/bin/python -m unittest discover -s tests -v`로 실행하며 임시 검증 계정·파일은 끝난 뒤 삭제합니다. 계산 흐름 검증에는 표시가 있는 테스트 계산본을 사용하며 실제 인력 집계 수치 검증을 대신하지 않습니다.
+- PostgreSQL 초기 스키마는 `gadong/schema_postgres.sql`입니다. 계정·파일·계산 상태 테이블에 RLS를 적용하고 브라우저용 `anon`·`authenticated` 역할의 직접 접근을 차단합니다. 서버에서만 DB 연결 정보를 사용합니다.
+- 외래키 10개로 사용자↔업로드·인사 변동·메일 이력·업로드 접수·계산 작업, 주차↔업로드·접수·계산 작업, 주차↔초안·게시 계산본을 연결합니다. 사용자 삭제 시 업무 행은 보존하고 사용자 참조만 NULL로 바꿉니다. 계산 작업의 `by_user`는 작성자 이름 기록으로 유지합니다.
+- 초안·게시본은 `(주차, 작업 ID)`를 함께 참조하므로 다른 주차의 계산본을 잘못 게시할 수 없습니다. 참조 중인 주차·작업의 단독 삭제는 거부하며, 한 트랜잭션에서 관련 자료를 함께 정리하는 것은 허용합니다.
+- `audit`의 사용자명은 과거 기록을 위한 문자열, `settings`는 독립 설정입니다. `file_objects`는 현재 파일 경로 목록이고 계산 작업은 불변 객체 버전 목록을 별도로 보관합니다. 만료 후 지워지는 업로드 접수 번호(`ticket_id`)도 업로드의 영구 외래키로 사용하지 않습니다.
+- 기존 zip 자동 백업은 SQLite용입니다. PostgreSQL에서는 실행하지 않으므로 DB 내보내기와 파일 백업을 별도로 준비해야 합니다.
+
 ## 처음 실행 (담당자님 PC, Windows)
-1. **Python 설치** (한 번만): https://www.python.org/downloads/ 에서 3.11 이상 설치.
+1. **Python 설치** (한 번만): https://www.python.org/downloads/ 에서 3.12 이상 설치.
    설치 첫 화면의 **"Add python.exe to PATH"** 체크.
 2. 이 폴더의 **`시작.bat`** 을 더블클릭.
    - 처음에는 필요한 프로그램(Flask, pandas, openpyxl)을 자동 설치합니다 (1~2분).

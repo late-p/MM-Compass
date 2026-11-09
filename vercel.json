@@ -1,5 +1,12 @@
 {
-  "version": 2,
-  "builds": [{ "src": "api/index.py", "use": "@vercel/python", "config": { "maxLambdaSize": "250mb", "includeFiles": ["gadong/**", "engine/**", "storage/**"] } }],
-  "routes": [{ "src": "/(.*)", "dest": "api/index.py" }]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "flask",
+  "buildCommand": "python scripts/prepare_vercel.py",
+  "regions": ["icn1"],
+  "functions": {
+    "app.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{storage/**,tests/**,작업기록.md,*.bat}"
+    }
+  }
 }

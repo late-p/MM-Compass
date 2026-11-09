@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}MM-Compass · 주차·재계산·게시{% endblock %}{% block head %}{% if running %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}{% block body %}
+{% extends "base.html" %}{% block title %}MM-Compass · 주차·재계산·게시{% endblock %}{% block head %}{% if running and not config.REMOTE_FILES %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}{% block body %}
 <h1>주차 · 재계산 · 게시</h1>
 <div class="sub">① 담당자 업로드 → ② <b>재계산</b> (몇 분) → ③ 계산본 미리보기·점검 목록 확인 → ④ <b>계산본 게시</b> → 회의용 화면에 반영 · 주차는 그 주 목요일 기준, 다음 주 월요일 회의</div>
 {% if pending %}<div class="card pv-yel"><b>반영 확정을 기다리는 업로드 {{ pending }}건</b> — <a href="{{ url_for('upload') }}">업로드 목록</a>에서 미리보기를 보고 '반영 확정'해야 재계산에 들어갑니다.</div>{% endif %}
@@ -7,7 +7,7 @@
 <div class="card"><table><thead><tr><th>주차</th><th>재계산</th><th>새 계산본</th><th>게시본 (회의용)</th><th>작업</th></tr></thead><tbody>
 {% for r in rows %}{% set i = info[r['label']] %}{% set s = i.st %}<tr>
 <td><b>{{ r['title'] }}</b><br><span class="muted">{{ r['label'] }}</span></td>
-<td>{% if s.state == 'running' %}<span class="st st-접수">계산 중</span> <span class="muted">{{ s.step }}</span>
+<td>{% if s.state == 'running' %}<span class="st st-접수">계산 중</span> <span class="muted" {% if config.REMOTE_FILES %}data-job-run="{{ url_for('advance_job', label=r['label']) }}" data-csrf="{{ csrf_token() }}"{% endif %}>{{ s.step }}</span>
 {% elif s.state == 'done' %}<span class="st st-반영">완료</span> <span class="muted">{{ s.finished }}</span>
 {% elif s.state == 'error' %}<span class="st st-반려">오류</span> <a href="{{ url_for('week_detail', label=r['label']) }}">원인 보기</a>{% if s.cause %}<br><span class="muted" style="font-size:12.5px">{{ s.cause }}</span>{% endif %}
 {% else %}<span class="muted">—</span>{% endif %}</td>
@@ -17,16 +17,17 @@
 <td>{% if r['published'] %}<span class="st st-반영">게시됨</span> <span class="muted">{{ r['published_at'] or '' }}</span>{% elif i.pub %}<span class="st st-접수">내림</span>{% else %}<span class="muted">없음</span>{% endif %}
 {% if i.pub %}<br><a href="{{ url_for('admin_raw', label=r['label'], page='meeting.html') }}" target="_blank">게시본 보기</a>{% endif %}</td>
 <td><form method="post" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="label" value="{{ r['label'] }}">
+{% if config.REMOTE_FILES and s.state=='running' %}<button name="act" value="cancel">계산 취소</button>{% endif %}
 <button name="act" value="rebuild" {{ 'disabled' if running }}>재계산</button>
 {% if i.draft and s.state == 'done' %}<button name="act" value="publish_draft" class="primary">계산본 게시</button>{% endif %}
 {% if r['published'] %}<button name="act" value="unpublish">게시 내리기</button>{% elif i.pub %}<button name="act" value="publish">다시 게시</button>{% endif %}</form></td></tr>
 {% else %}<tr><td colspan="5" class="muted">주차가 없습니다.</td></tr>{% endfor %}</tbody></table>
-{% if running %}<p class="muted">계산 중에는 10초마다 이 화면이 새로고침됩니다.</p>{% endif %}</div>
-<div class="card"><h2>백업</h2>
+{% if running %}<p class="muted">{% if config.REMOTE_FILES %}이 화면을 열어 두면 단계별로 계산합니다. 연결이 끊겨도 완료한 단계는 저장되며, 이 화면으로 돌아오면 이어집니다.{% else %}계산 중에는 10초마다 이 화면이 새로고침됩니다.{% endif %}</p>{% endif %}</div>
+{% if not config.DATABASE_URL %}<div class="card"><h2>백업</h2>
 <p class="muted" style="margin-top:0">계정 · 업로드 원본 · 게시본 · 기본 입력 파일을 zip으로 저장합니다. <b>하루 1번 자동</b>(사이트가 켜져 있을 때) + <b>계산본 게시 직후</b> · 최근 30개 보관 · 백업 파일에도 인사정보가 들어 있으니 외부 공유 금지</p>
 <form method="post" class="row"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <div style="flex:3"><label>백업 폴더 <span class="muted">(PC가 고장 나도 남도록 다른 드라이브·개인 네트워크 폴더 권장 · 비우면 기본 위치)</span></label><input name="path" value="{{ bk.dir }}" style="max-width:none"></div>
 <div style="flex:0 0 auto"><button name="act" value="backup_dir">폴더 저장</button> <button name="act" value="backup_now" class="primary">지금 백업</button></div></form>
 <table style="margin-top:12px"><thead><tr><th>백업 파일</th><th>만든 시각</th><th class="num">크기</th></tr></thead><tbody>
 {% for b in bk.files %}<tr><td>{{ b.name }}</td><td>{{ b.at }}</td><td class="num">{{ (b.size/1048576)|round(1) }}MB</td></tr>{% else %}<tr><td colspan="3" class="muted">아직 백업이 없습니다.</td></tr>{% endfor %}</tbody></table>
-<p class="muted">복원: 사이트를 끄고 → zip 안의 storage 폴더 내용을 가동ON_site\storage 에 덮어쓰고 → 시작.bat (zip 안 복원방법.txt 참고)</p></div>{% endblock %}
+<p class="muted">복원: 사이트를 끄고 → zip 안의 storage 폴더 내용을 가동ON_site\storage 에 덮어쓰고 → 시작.bat (zip 안 복원방법.txt 참고)</p></div>{% endif %}{% endblock %}

@@ -12,7 +12,8 @@ _cache = {}
 def key(corp, hq, dv, tm): return " · ".join([corp or "", hq or "", dv or "", tm or ""])
 
 def _latest(storage):
-    w = os.path.join(storage, "work")
+    from .files import latest_work_root
+    w = latest_work_root(storage)
     if not os.path.isdir(w): return None
     ls = sorted(l for l in os.listdir(w) if re.fullmatch(r"\d{4}-\d{2}-W\d", l) and os.path.exists(os.path.join(w, l, "use_target.pkl")))
     return ls[-1] if ls else None
@@ -37,7 +38,8 @@ def roster(storage):
     사람: {corp,gid,name,hq,dv,tm,key,T[12]} · 당월~12월 가동대상이 하나도 없는 사람(퇴사·전출·휴직)은 빠짐"""
     lb = _latest(storage)
     if not lb: return None, 0, []
-    p = os.path.join(storage, "work", lb, "use_target.pkl"); mt = os.path.getmtime(p)
+    from .files import latest_work_root
+    p = os.path.join(latest_work_root(storage), lb, "use_target.pkl"); mt = os.path.getmtime(p)
     if _rcache.get("k") == (p, mt): return lb, _rcache["cur"], _rcache["v"]
     import pandas as pd
     t = pd.read_pickle(p)

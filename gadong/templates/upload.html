@@ -18,7 +18,7 @@ box.addEventListener('change',count);box.addEventListener('click',e=>{const b=e.
 document.getElementById('tall').onclick=()=>{box.querySelectorAll('input[name=team]').forEach(x=>x.checked=true);count()};document.getElementById('tnone').onclick=()=>{box.querySelectorAll('input[name=team]').forEach(x=>x.checked=false);count()};
 document.getElementById('tplf').addEventListener('submit',e=>{const a=box.querySelectorAll('input[name=team]'),c=box.querySelectorAll('input[name=team]:checked');if(!c.length){e.preventDefault();alert('팀을 하나 이상 골라 주세요.')}else if(c.length===a.length)a.forEach(x=>x.disabled=true)});
 draw()})();</script>
-<div class="card"><h2>파일 올리기 {% if false %}<a class="btn" style="float:right;font-size:13px" href="{{ url_for('plan_template', dept=cur) }}">⬇ 우리 부서 템플릿 받기</a>{% endif %}</h2><form method="post" enctype="multipart/form-data">
+<div class="card"><h2>파일 올리기 {% if false %}<a class="btn" style="float:right;font-size:13px" href="{{ url_for('plan_template', dept=cur) }}">⬇ 우리 부서 템플릿 받기</a>{% endif %}</h2><form method="post" enctype="multipart/form-data" {% if config.REMOTE_FILES %}data-online-upload="{{ url_for('upload_sign') }}" data-finish="{{ url_for('upload_finish') }}"{% endif %}>
 <input type="hidden" name="csrf" value="{{ csrf_token() }}"><div class="row">
 {% if u['role']=='admin' %}<div><label>반영 주차</label><select name="week">{% for k,v in week_opts %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>{% endif %}
 <div><label>자료 종류</label><select name="kind">{% for k,v in kinds.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
@@ -27,7 +27,7 @@ draw()})();</script>
 {% else %}<input value="{{ cur }}" disabled><input type="hidden" name="dept" value="{{ cur }}">{% endif %}</div></div>
 <p class="muted" style="margin:10px 0 0">팀별 분리는 자동입니다: 인력롤링 양식을 본부·사업부 단위로 올리면 팀별로 나뉘어 등록되고(팀마다 미리보기·제출이 따로 생깁니다), AX 가득가동현황·DX·MSP 같은 독자 양식과 하반기 총괄은 파일 그대로 한 건으로 등록됩니다.</p>
 <p class="muted" style="margin:8px 0 0">투입계획: 부서를 고르지 않으면 파일 이름·양식으로 부서를 자동 인식 · 하반기 총괄은 「전체 (하반기 총괄)」 · SOLD·가동인력목록은 법인 선택 · 잘못 올린 파일은 '삭제'</p><label>파일</label><div class="drop"><input type="file" name="file" accept=".xlsx,.xlsm,.xls" required></div>
-<div style="margin-top:12px"><button class="primary" id="upbtn">업로드</button> <span class="muted" id="upmsg">올리면 바로 미리보기 화면으로 넘어가고, 미리보기는 뒤에서 만들어집니다.</span></div></form>
+<div style="margin-top:12px"><button class="primary" id="upbtn">업로드</button> <span class="muted" id="upmsg">파일 전송·양식 확인 후 미리보기 화면으로 이동합니다.</span></div></form>
 <script>document.getElementById('upbtn').closest('form').addEventListener('submit',function(){var b=document.getElementById('upbtn');b.disabled=true;b.textContent='올리는 중…';document.getElementById('upmsg').textContent='파일을 올리는 중입니다. 잠시만 기다려 주세요.'});</script></div>
 <div class="card"><h2>{{ '전체 업로드 내역' if u['role']=='admin' else '내 업로드 내역' }}</h2>
 <table><thead><tr><th>일시</th><th>주차</th><th>종류</th><th>부서</th><th>파일</th>{% if u['role']=='admin' %}<th>올린 사람</th>{% endif %}<th>상태</th><th>반영 자리 · 메모</th><th>{{ '처리' if u['role']=='admin' else '' }}</th></tr></thead><tbody>

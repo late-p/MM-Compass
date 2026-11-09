@@ -21,3 +21,11 @@ engine/.fmtcache.json
 # 실데이터가 든 배포용·전달용 압축 파일
 *.zip
 ss_*.md
+
+# 환경변수·비밀값, 이전 작업 백업, 편집 백업
+.env
+.env.*
+!.env.example
+.0 기존 작업(~1106)/
+*.bak*
+.python-version.bak

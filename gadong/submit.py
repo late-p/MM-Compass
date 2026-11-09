@@ -7,7 +7,7 @@
 import os, json, shutil, uuid, datetime as dt
 from flask import render_template, request, redirect, url_for, abort, flash, g, current_app
 from werkzeug.utils import secure_filename
-from . import db
+from . import db, files
 from .auth import login_required, check_csrf
 from .scope import user_depts, pick_dept, allowed, units_of, ALL
 from . import org as ORG
@@ -24,8 +24,8 @@ NOCHANGE = "변동없음"
 def _now(): return db.now()
 
 def ensure_schema(app):
-    import sqlite3
-    with sqlite3.connect(app.config["DB_PATH"]) as c:
+    if app.config.get("DATABASE_URL"): return
+    with db.transaction(app) as c:
         c.executescript("""
 CREATE TABLE IF NOT EXISTS hr_notes(
   id INTEGER PRIMARY KEY, dept TEXT, user_id INTEGER, name TEXT, sabun TEXT DEFAULT '', kind TEXT, date TEXT,
@@ -41,7 +41,7 @@ def get_setting(key, default=None):
     except Exception: return default
 
 def set_setting(key, val):
-    d = db.get(); d.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, json.dumps(val, ensure_ascii=False))); d.commit()
+    d = db.get(); d.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, json.dumps(val, ensure_ascii=False))); d.commit()
 
 WD = "월화수목금토일"
 def deadline_default():
@@ -227,13 +227,15 @@ def init_app(app):
             ext = ".xlsx" if sp.endswith(".xlsx") else os.path.splitext(sp)[1]
             stored = f"{dt.datetime.now():%Y%m%d%H%M%S}_{uuid.uuid4().hex[:8]}{ext}"
             shutil.move(sp, os.path.join(S, "uploads", stored)) if sp.startswith(tmpd) else shutil.copy(sp, os.path.join(S, "uploads", stored))
-            d.execute("INSERT INTO uploads(user_id,dept,kind,week,orig_name,stored_name,size,status,note,uploaded_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            files.persist(os.path.join(S, "uploads", stored))
+            new_id = d.execute("INSERT INTO uploads(user_id,dept,kind,week,orig_name,stored_name,size,status,note,uploaded_at) VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id",
                       (u["id"], updept, "plan", wl, src["orig_name"], stored, os.path.getsize(os.path.join(S, "uploads", stored)), new,
-                       f"{NOCHANGE} · 지난 값 그대로 (#{src['id']} · {src['week']} 반영본)", _now()))
-            ids.append(d.execute("SELECT max(id) FROM uploads").fetchone()[0])
+                       f"{NOCHANGE} · 지난 값 그대로 (#{src['id']} · {src['week']} 반영본)", _now())).fetchone()[0]
+            ids.append(new_id)
         tmpd = os.path.join(S, "work", "_split_" + uuid.uuid4().hex[:8])
         for src, ks in groups.values():
-            sp = os.path.join(S, "uploads", secure_filename(src["stored_name"]))
+            sp = files.ensure("uploads/" + secure_filename(src["stored_name"]))
+            if not sp: continue
             if not os.path.exists(sp): continue
             if src["dept"] in ks and len(ks) == 1:   # 팀 단위로 낸 파일 → 그대로
                 put(src["dept"], src, sp, ks); made += 1; continue
@@ -245,7 +247,7 @@ def init_app(app):
                 for k, p in parts.items(): put(k, src, p["path"], [k]); made += 1
             else: put(src["dept"], src, sp, ks); made += len(ks)   # 나눌 수 없는 양식 → 올렸던 범위 그대로
         shutil.rmtree(tmpd, ignore_errors=True)
-        d.execute("INSERT OR IGNORE INTO weeks(label,title) VALUES(?,?)", (wl, wt)); d.commit()
+        d.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (wl, wt)); d.commit()
         db.audit(u["username"], "plan_nochange", f"{dept} · {wl} · {made}팀")
         msg = f"{wt} '변동없음'으로 {made}팀을 제출했습니다. 지난번 반영본이 그대로 쓰입니다."
         if none_: msg += f" (지난 반영본이 없는 {len(none_)}팀은 화면 입력이나 파일로 내 주세요: {', '.join(ORG.label(k) for k in none_[:4])}{' …' if len(none_) > 4 else ''})"
@@ -265,10 +267,9 @@ def init_app(app):
         if not name or kind not in HR_KINDS or not date:
             flash("성명·변동 종류·날짜를 모두 넣어 주세요."); return redirect(url_for("my_home", dept=dept) + "#hr")
         d = db.get()
-        d.execute("INSERT INTO hr_notes(dept,user_id,name,sabun,kind,date,to_org,memo,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        nid = d.execute("INSERT INTO hr_notes(dept,user_id,name,sabun,kind,date,to_org,memo,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) RETURNING id",
                   (dept, u["id"], name, f.get("sabun", "").strip()[:20], kind, date, f.get("to_org", "").strip()[:100],
-                   f.get("memo", "").strip()[:300], "반영" if u["role"] == "admin" else "접수", _now(), _now()))
-        nid = d.execute("SELECT max(id) FROM hr_notes").fetchone()[0]
+                   f.get("memo", "").strip()[:300], "반영" if u["role"] == "admin" else "접수", _now(), _now())).fetchone()[0]
         d.commit(); db.audit(u["username"], "hr_note", f"{dept} · {name} · {kind} · {date}")
         if u["role"] == "admin" and f.get("back") == "board":
             flash(f"{name} · {kind} · {date} 제출을 저장했습니다. 다음 재계산부터 가동대상MM에 반영됩니다."); return redirect(url_for("submit_board", week=f.get("week", "")) + "#hr")

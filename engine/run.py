@@ -224,6 +224,17 @@ def _hr_notes(storage):
         pass
     return out
 
+def _alias(storage):
+    """코드에 적힌 실제 이름·낱말 → 가명 대응 (가명 자료로 시연할 때만). 없으면 {} = 코드 그대로.
+    환경변수 GADONG_ALIAS(JSON 문자열) 또는 storage/inputs/base/alias.json 에서 읽는다."""
+    try:
+        raw = os.environ.get("GADONG_ALIAS", "").strip()
+        if raw: return dict(json.loads(raw))
+        p = os.path.join(storage, "inputs", "base", "alias.json")
+        if os.path.exists(p): return dict(json.load(open(p, encoding="utf-8")))
+    except Exception: pass
+    return {}
+
 def prepare(storage, label, user):
     work = os.path.join(storage, "work", label) + os.sep
     os.makedirs(work, exist_ok=True)
@@ -276,7 +287,8 @@ def prepare(storage, label, user):
     try: targets = json.load(open(os.path.join(storage, "targets.json"), encoding="utf-8"))
     except Exception: targets = {}
     hr_notes = _hr_notes(storage)
-    cfg = dict(work=work, inputs=inputs, short=short, dept_files=dept_files, files=files, week=meta, fresh=fresh, act=act, targets=targets, hr_notes=hr_notes)
+    alias = _alias(storage)
+    cfg = dict(work=work, inputs=inputs, short=short, dept_files=dept_files, files=files, week=meta, fresh=fresh, act=act, targets=targets, hr_notes=hr_notes, alias=alias)
     json.dump(cfg, open(os.path.join(work, "cfg.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return cfg, warns, used, log
 
@@ -310,6 +322,18 @@ def finish(storage, label, user, cfg, warns, used):
     checks["plan"] = [[str(v).replace(" ((직속))", "").replace("((직속))", "") for v in x] for x in checks.get("plan", [])]
     json.dump(checks, open(os.path.join(draft, "checks.json"), "w", encoding="utf-8"), ensure_ascii=False)
     json.dump(dict(meta=meta, used=used, by=user, at=dt.datetime.now().strftime("%Y-%m-%d %H:%M")), open(os.path.join(draft, "inputs.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    _apply_alias(draft, cfg.get("alias") or {})
+
+
+def _apply_alias(draft, alias):
+    """가명 시연용: 코드 안 문구에 남은 실제 이름·낱말을 결과 파일(화면·점검 목록)에서 가명으로 바꾼다. alias 가 비어 있으면 아무것도 안 함."""
+    if not alias: return
+    for fn in ("admin.html", "meeting.html", "summary.json", "checks.json", "inputs.json"):
+        p = os.path.join(draft, fn)
+        if not os.path.exists(p): continue
+        t = open(p, encoding="utf-8").read()
+        for k, v in alias.items(): t = t.replace(k, v)
+        open(p, "w", encoding="utf-8").write(t)
 
 
 def _job(storage, label, user):

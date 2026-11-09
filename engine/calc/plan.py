@@ -32,16 +32,24 @@ FMT = {F_AX: "ax", F_MSP: "msp", F_DXP: "platform"}
 for _d in DEPT: SHORT[_d["path"]] = _d["label"]; FMT[_d["path"]] = _d["fmt"]
 PRESENT = collections.defaultdict(set)
 PRESENT_X = collections.defaultdict(set)   # 동명이인 구분용: (이름, 그룹사번, 팀)
-SOLD_KEEP = {("아이티센클로잇", "김충만"), ("아이티센클로잇", "이가은"), ("아이티센클로잇", "박상민"),
-             ("아이티센엔텍", "전민서")}   # 엔텍 동행복권 인원 중 SOLD에 10~12월 배정이 있는 사람은 SOLD 기준
-IGNORE = {"백재현"}   # 퇴사자
+SOLD_KEEP = {("아이티센클로잇", _cfg.A("김충만")), ("아이티센클로잇", _cfg.A("이가은")), ("아이티센클로잇", _cfg.A("박상민")),
+             ("아이티센엔텍", _cfg.A("전민서"))}   # 엔텍 동행복권 인원 중 SOLD에 10~12월 배정이 있는 사람은 SOLD 기준
+IGNORE = {_cfg.A("백재현")}   # 퇴사자
 FIXED = []   # 성명 오기 보정 내역   # 10/1 MSP 전배자: SOLD 10~12월 그대로
-CAP_T = {("아이티센클로잇", "이대근")}   # 휴직(~11/16): 월 투입을 가동대상MM 이하로   # 파일에 이름이 있는 사람 (대기 포함)
+CAP_T = {("아이티센클로잇", _cfg.A("이대근"))}   # 휴직(~11/16): 월 투입을 가동대상MM 이하로   # 파일에 이름이 있는 사람 (대기 포함)
 NONPJ = ("대기", "휴직", "퇴사", "육아", "전배", "전적", "교육", "N/A")
 def clean_name(n): return re.sub(r"-\d+$", "", str(n).strip()) if n else None
 def gid(x):
     try: return int(float(str(x).strip()))
     except Exception: return None
+
+def _is_rolling(f):
+    """파일에 '인력_투입현황MM' 시트가 있으면 롤링 양식"""
+    try:
+        wb = openpyxl.load_workbook(f, read_only=True)
+        ok = any(w.title.strip().endswith("인력_투입현황MM") for w in wb.worksheets)
+        wb.close(); return ok
+    except Exception: return False
 
 def rolling_rows(f):
     df, _ = parse_mm(f)
@@ -203,7 +211,9 @@ def build():
     def _parse(f):
         if not __import__("os").path.isfile(f): return []
         try:
-            return ax_rows(f) if FMT.get(f) == "ax" else msp_rows(f) if FMT.get(f) == "msp" else platform_rows(f) if FMT.get(f) == "platform" else (platform_rows(f) + dxmsp_rows(f)) if FMT.get(f) == "dx" else rolling_rows(f)
+            fm = FMT.get(f)
+            if fm in ("ax", "msp", "platform", "dx") and _is_rolling(f): fm = None   # 롤링 양식('인력_투입현황MM' 시트)으로 올린 파일은 자리와 상관없이 롤링으로 읽음
+            return ax_rows(f) if fm == "ax" else msp_rows(f) if fm == "msp" else platform_rows(f) if fm == "platform" else (platform_rows(f) + dxmsp_rows(f)) if fm == "dx" else rolling_rows(f)
         except Exception as ex:
             raise RuntimeError(f"투입계획 파일을 읽지 못했습니다: {SHORT[f]} — 양식(시트·열 이름)이 바뀌었는지 확인해 주세요 ({type(ex).__name__})") from ex
     R = {f: _parse(f) for f in SHORT}
@@ -251,7 +261,7 @@ def build():
             if kind is None:
                 kr = x["kind_raw"]
                 kind = "제안" if "제안" in kr else ("R&D·내부과제" if "R&D" in kr else "이행")
-            if corp == "아이티센엔텍" and "동행복권" in x["pjt"] and "Next" in x["pjt"]: kind = "R&D·내부과제"
+            if corp == "아이티센엔텍" and _cfg.A("동행복권") in x["pjt"] and "Next" in x["pjt"]: kind = "R&D·내부과제"
             row = {"법인": corp, "본부": p["hq"], "사업부": p["dv"], "팀": p["tm"], "성명": p["name"], "그룹사번": g, "구분": kind,
                    "코드": x["code"] if x["code"] not in ("N/A", "#N/A") else "", "PJT 명": x["pjt"], "출처": SHORT[x["src"]]}
             for m in range(12): row[MC[m]] = 0.0
@@ -362,16 +372,16 @@ def anomalies():
     except Exception: pass
     have = set(zip(P["법인"], P["그룹사번"]))
     t = pd.read_pickle(SP + "use_target.pkl"); t["_g"] = t["그룹사번"].apply(gid)
-    for nm in ("김충만", "이가은", "박상민"):
+    for nm in (_cfg.A("김충만"), _cfg.A("이가은"), _cfg.A("박상민")):
         x = P[P["성명"] == nm]
         A.append(("반영 완료 · 전배자 SOLD 기준", f"{nm} (MSP엔지니어링팀)", f"10/1 플랫폼 → MSP 전배 · {RQ} = SOLD 내역 그대로 (월 " + "/".join(f"{x[c].sum():.2f}" for c in MC) + ")"))
     for nm, mon, tot, T in notes["capT"]:
         if any(nm == x[1] for x in CAP_T): A.append(("반영 완료 · 휴직(~11/16)", nm, f"{mon} 투입 {tot:.2f} → {T:.2f} (가동대상MM에 맞춤)"))
         else: A.append(("반영 완료 · 가동대상만큼만 반영", nm, f"{mon} 투입계획 {tot:.2f} > 가동대상 {T:.2f} → {T:.2f}로 맞춤 (퇴사·휴직·전출 후 계획이 남아 있음 · 부서 파일 확인)"))
-    e = P[(P["법인"] == "아이티센엔텍") & P["PJT 명"].str.contains("동행복권") & P["PJT 명"].str.contains("Next")]
-    if len(e): A.append(("반영 완료 · 9월 회신 파일 기준", "엔텍 동행복권 Next Gen", f'{", ".join(e["성명"])} {RQ} R&D (SOLD에 배정 없음)'))
-    j = P[(P["법인"] == "아이티센엔텍") & (P["성명"] == "전민서")]
-    if len(j): A.append(("반영 완료 · SOLD 배정 우선", "전민서 (복권사업팀)", "SOLD 현대모비스 nSMART 10월 1.00 · 11~12월 0 → 동행복권 계획 대신 SOLD 적용"))
+    e = P[(P["법인"] == "아이티센엔텍") & P["PJT 명"].str.contains(_cfg.A("동행복권")) & P["PJT 명"].str.contains("Next")]
+    if len(e): A.append(("반영 완료 · 9월 회신 파일 기준", _cfg.A("엔텍 동행복권 Next Gen"), f'{", ".join(e["성명"])} {RQ} R&D (SOLD에 배정 없음)'))
+    j = P[(P["법인"] == "아이티센엔텍") & (P["성명"] == _cfg.A("전민서"))]
+    if len(j): A.append(("반영 완료 · SOLD 배정 우선", _cfg.A("전민서 (복권사업팀)"), _cfg.A("SOLD 현대모비스 nSMART 10월 1.00 · 11~12월 0 → 동행복권 계획 대신 SOLD 적용")))
     for corp, nm, tm, mon, pm, sm in notes["sold_over"]:
         A.append(("반영 완료 · SOLD 배정 우선", f"{nm} ({tm})", f"{mon} 투입계획 {pm:.2f} < SOLD {sm:.2f} → SOLD 적용"))
     for wrong, right, pj in dict.fromkeys(FIXED):

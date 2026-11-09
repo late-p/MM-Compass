@@ -25,7 +25,7 @@ def load():
 if __name__ == "__main__":
     for k, v in load().items(): print(k, v["hq"], v["dv"], [round(x, 2) for x in v["T"][8:]], [round(x,2) for x in v["idle"][8:]])
 
-NOT_IDLE = {("아이티센엔텍", "김영관")}   # 10.08 파일 5-2 명단 오기: SOLD 모비스_인도네시아 AMOS 10~12월 1.00 투입, 팀 통계(Sold 22)에도 투입으로 잡힘
+NOT_IDLE = {("아이티센엔텍", __import__("cfg").A("김영관"))}   # 10.08 파일 5-2 명단 오기: SOLD 모비스_인도네시아 AMOS 10~12월 1.00 투입, 팀 통계(Sold 22)에도 투입으로 잡힘
 COVER = {}   # 법인별 대기 명단 월 범위 (m0, 개수)
 def idle_list():
     """5-1 CLO(9~12월), 5-2 ET(1~12월) 대기 명단 → [{corp,name,본부,사업부,팀,직급,직책,직무,idle[12],note,months}]"""
@@ -53,7 +53,7 @@ def idle_list():
     return out
 
 # 10.08 파일 5-1 명단 누락 보정: 팀 통계 대기에는 포함, 명단에만 없음 (투입계획 기준 9~12월 0.30 대기)
-EXTRA_IDLE = [dict(corp="아이티센클로잇", sabun="50149", hq="AX사업본부", dv="AX Consulting & Eng 사업부", tm="AX엔지니어링팀", name="정재희",
+EXTRA_IDLE = [dict(corp="아이티센클로잇", sabun=__import__("cfg").A("50149"), hq="AX사업본부", dv="AX Consulting & Eng 사업부", tm="AX엔지니어링팀", name=__import__("cfg").A("정재희"),
                    직급="G4", 직책="팀원", 직무="QM", idle=[None]*8 + [0.3, 0.3, 0.3, 0.3], note="명단 누락 보정 (팀 대기 포함분)", m0=8)]
 
 # ---------------- 대시보드 반영 ----------------

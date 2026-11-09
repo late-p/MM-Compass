@@ -17,6 +17,11 @@ WEEK = _C["week"]
 TARGETS = _C.get("targets") or {}   # 관리자가 정한 목표 가득률 {"all": 전체 기준, "net": 비매출 모수 제외 기준}
 HR_NOTES = _C.get("hr_notes", [])   # 사이트 '인사 변동 제출' 중 계산에 넣을 것 (반영 상태)
 FRESH = set(_C.get("fresh", []))   # 통계 파일보다 나중에 올라온 투입계획 파일 경로
+ALIAS = _C.get("alias") or {}   # 코드에 적힌 실제 이름 → 가명 (가명 자료 시연용). 비어 있으면 코드 그대로
+def A(s):
+    """코드에 적힌 이름·낱말을 ALIAS 대로 바꾼다 (ALIAS 가 비어 있으면 그대로)"""
+    for k, v in ALIAS.items(): s = s.replace(k, v)
+    return s
 def inp(role):
     if role not in IN: raise KeyError(f"입력 파일 없음: {role}")
     return IN[role]

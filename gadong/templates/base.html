@@ -16,7 +16,7 @@
   {% if u['role']=='admin' %}
   {% set pc = pending_count() %}{% set bc = board_count() %}<div class="dd {{ 'on' if ep in ('weeks','week_detail','users','audit_log','submit_board','targets') }}"><button type="button">관리{% if pc+bc %} <em class="nbadge">{{ pc+bc }}</em>{% endif %} <i>▾</i></button><div class="ddm">
     <a href="{{ url_for('submit_board') }}" class="{{ 'on' if ep=='submit_board' }}">제출 현황{% if bc %} <em class="nbadge">{{ bc }}</em>{% endif %}</a>
-    <a href="{{ url_for('weeks') }}" class="{{ 'on' if ep in ('weeks','week_detail') }}">주차 · 재계산 · 게시</a>
+    <a href="{{ url_for('weeks') }}" class="{{ 'on' if ep in ('weeks','week_detail') }}">주차 · 통계 집계 · 게시</a>
     <a href="{{ url_for('users') }}" class="{{ 'on' if ep=='users' }}">사용자{% if pc %} <em class="nbadge">{{ pc }}</em>{% endif %}</a>
     <a href="{{ url_for('targets') }}" class="{{ 'on' if ep=='targets' }}">목표 가득률</a>
     <a href="{{ url_for('audit_log') }}" class="{{ 'on' if ep=='audit_log' }}">접속 · 변경 기록</a></div></div>{% endif %}

@@ -75,7 +75,7 @@
 </div>
 <div id="draft"></div>
 <div class="card">
-<div class="pe-tools"><b>{{ '내 담당 전체' if dept == ALL else dept }}</b><a href="{{ url_for('plan_template', dept=dept) }}" style="font-size:12.5px">⬇ 엑셀 템플릿{% if data.teams|length > 1 %} (한 시트 · 팀 열){% endif %}</a><span class="muted">· {{ data.teams|length }}팀 · {{ data.people|length }}명 · 기준 계산본 {{ data.label }}</span>
+<div class="pe-tools"><b>{{ '내 담당 전체' if dept == ALL else dept }}</b><a href="{{ url_for('plan_template', dept=dept) }}" style="font-size:12.5px">⬇ 엑셀 템플릿{% if data.teams|length > 1 %} (한 시트 · 팀 열){% endif %}</a><span class="muted">· {{ data.teams|length }}팀 · {{ data.people|length }}명 · 기준 집계본 {{ data.label }}</span>
 {% if data.teams|length > 1 %}<select id="tf" style="width:auto;max-width:300px" title="팀 보기"><option value="">모든 팀 한 화면에</option>{% for t in data.teams %}<option value="{{ t.key }}">{{ t.label }} ({{ t.n }}명)</option>{% endfor %}</select>{% endif %}
 <input type="search" id="q" placeholder="이름·팀·프로젝트 찾기"><label class="muted"><input type="checkbox" id="onlyIdle"> 대기 있는 사람만</label><label class="muted"><input type="checkbox" id="onlyChg"> 변경한 사람만</label>
 <span class="pe-legend"><i style="background:#E9F5EF"></i>대기 없음 (다 투입)<i style="background:#FFF6DD"></i>대기 있음<i style="background:#FBE4E6"></i>초과 투입 (빨간 칸)</span></div>

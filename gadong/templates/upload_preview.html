@@ -36,7 +36,7 @@
 {% for it in c['items'] or [] %}<tr class="pi"><td><span class="kd kd-{{ {'이행':'ex','제안':'pr','R&D·내부과제':'rd'}.get(it.kind,'ex') }}">{{ it.kind }}</span></td><td class="pjn" title="{{ it.pj }}">{{ it.pj }}{% if it.old|sum < 0.005 %} <em class="tag-new">새로 들어감</em>{% elif it.new|sum < 0.005 %} <em class="tag-out">빠짐</em>{% endif %}</td>
 {% for i in range(MS|length) %}{% set d = it.new[i]-it.old[i] %}<td class="num {{ 'up' if d > 0.005 else ('dn' if d < -0.005 else 'same') }}">{{ '%.2f'|format(it.old[i]) }} → {{ '%.2f'|format(it.new[i]) }}</td>{% endfor %}</tr>{% endfor %}
 </tbody>{% endfor %}</table>
-<p class="muted sm" style="margin:8px 0 0">빨강 = 늘어남 · 초록 = 줄어듦 · 회색 = 그대로 · 대기 = 가동대상 − 이 파일의 투입 합계 (가장 최근 재계산 명단 기준)</p></details></div>{% endif %}
+<p class="muted sm" style="margin:8px 0 0">빨강 = 늘어남 · 초록 = 줄어듦 · 회색 = 그대로 · 대기 = 가동대상 − 이 파일의 투입 합계 (가장 최근 통계 집계 명단 기준)</p></details></div>{% endif %}
 {% endif %}
 <div class="card"><h2>처리 상태 선택</h2>
 <div class="pv-actions">
@@ -50,5 +50,5 @@
 {% if u['role'] == 'admin' or (r['user_id'] == u['id'] and r['status'] != '반영') %}
 <form method="post" action="{{ url_for('upload_delete', uid=r['id']) }}" onsubmit="return confirm('이 업로드를 삭제할까요? 원본 파일도 지워집니다.')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="danger" title="잘못 올린 업로드를 삭제합니다 (원본 파일도 삭제)">삭제</button></form>{% endif %}
 </div>
-<p class="muted" style="margin-top:10px">※ '반영 확정'된 내역만 통계 집계 대상에 포함되며, [재계산] 및 [게시]를 완료해야 회의용 대시보드에 최종 적용됩니다.</p></div>
+<p class="muted" style="margin-top:10px">※ '반영 확정'된 내역만 통계 집계 대상에 포함되며, [통계 집계] 및 [게시]를 완료해야 회의용 대시보드에 최종 적용됩니다.</p></div>
 {% endblock %}

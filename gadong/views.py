@@ -95,7 +95,7 @@ def place_of(kind, dept, path):
 
 STATUS_CSS = {"확인 대기": "wait", "제출": "sub", "반영": "ok", "보류": "hold", "반려": "rej", "접수": "sub"}
 STATUS_HELP = {"확인 대기": "미리보기를 확인한 뒤 '제출'해 주세요", "제출": "관리자 반영 확정을 기다립니다",
-               "반영": "다음 재계산부터 계산에 들어갑니다", "보류": "계산에서 빠집니다", "반려": "계산에서 빠집니다"}
+               "반영": "다음 통계 집계부터 계산에 들어갑니다", "보류": "계산에서 빠집니다", "반려": "계산에서 빠집니다"}
 
 def make_preview(uid):
     """업로드 미리보기 생성 (별도 프로세스, 보통 수 초)"""
@@ -403,7 +403,7 @@ def init_app(app):
         if new in ("반려", "보류") and request.form.get("note", "").strip(): d.execute("UPDATE uploads SET note=? WHERE id=?", (request.form["note"].strip()[:300], uid))
         d.commit()
         db.audit(g.user["username"], "upload_" + act, f'{uid} · {r["orig_name"]} → {new}')
-        flash({"반영": "반영 확정했습니다. 다음 재계산부터 이 파일이 쓰입니다.", "제출": "제출했습니다. 관리자가 확인 후 반영합니다.",
+        flash({"반영": "반영 확정했습니다. 다음 통계 집계부터 이 파일이 쓰입니다.", "제출": "제출했습니다. 관리자가 확인 후 반영합니다.",
                "보류": "보류했습니다. 계산에서 빠집니다.", "반려": "반려했습니다. 계산에서 빠지고 지금까지 쓰던 파일이 그대로 쓰입니다."}[new])
         nx = request.form.get("next", "")
         if nx.startswith("/") and not nx.startswith("//"): return redirect(nx)
@@ -422,7 +422,7 @@ def init_app(app):
         try: os.remove(os.path.join(current_app.config["STORAGE"], "previews", f"{int(uid)}.json"))
         except OSError: pass
         db.audit(g.user["username"], "upload_delete", f'{uid} · {r["orig_name"]}')
-        flash(f'삭제했습니다: {r["orig_name"]} (다음 재계산부터 빠집니다)')
+        flash(f'삭제했습니다: {r["orig_name"]} (다음 통계 집계부터 빠집니다)')
         nx = request.form.get("next", "")
         return redirect(nx if nx.startswith("/") and not nx.startswith("//") else url_for("upload"))
 
@@ -446,7 +446,7 @@ def init_app(app):
         db.audit(g.user["username"], "upload_status", f"{uid} → {st}")
         return redirect(url_for("upload"))
 
-    # ---------------- 주차 · 재계산 · 게시 ----------------
+    # ---------------- 주차 · 통계 집계 · 게시 ----------------
     @app.route("/admin/weeks", methods=["GET", "POST"])
     @login_required("admin")
     def weeks():
@@ -461,13 +461,13 @@ def init_app(app):
                 if ok: d.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (label, engine_run.week_meta(label)["title"]))
                 flash(msg)
             elif act == "cancel" and files.enabled():
-                jobs.cancel(label); flash("계산을 취소했습니다. 다시 재계산할 수 있습니다.")
+                jobs.cancel(label); flash("계산을 취소했습니다. 다시 통계 집계할 수 있습니다.")
             elif act == "publish_draft" and files.enabled():
-                try: jobs.publish(label); flash(f"{label} 계산본을 게시했습니다.")
+                try: jobs.publish(label); flash(f"{label} 집계본을 게시했습니다.")
                 except ValueError as error: flash(str(error))
             elif act == "publish_draft":
                 src = os.path.join(st, "drafts", secure_filename(label)); dst = os.path.join(st, "published", secure_filename(label))
-                if not draft_path(label, "meeting.html"): flash("게시할 계산본이 없습니다.")
+                if not draft_path(label, "meeting.html"): flash("게시할 집계본이 없습니다.")
                 else:
                     import shutil
                     os.makedirs(dst, exist_ok=True)
@@ -481,11 +481,11 @@ def init_app(app):
                         for x in used:
                             if x.get("upload_id"): d.execute("UPDATE uploads SET status='반영' WHERE id=? AND status='접수'", (x["upload_id"],))
                     except Exception: pass
-                    flash(f"{label} 새 계산본을 게시했습니다. 회의용 화면에 바로 보입니다.")
+                    flash(f"{label} 새 집계본을 게시했습니다. 회의용 화면에 바로 보입니다.")
                     from . import backup as _bk
                     threading.Thread(target=_bk.make_backup, args=(current_app._get_current_object(), "게시"), daemon=True).start()
             elif act == "publish":
-                if not published_path(label, "meeting.html"): flash("이 주차의 게시본이 없습니다. 먼저 재계산 후 계산본을 게시하세요.")
+                if not published_path(label, "meeting.html"): flash("이 주차의 게시본이 없습니다. 먼저 통계 집계 후 집계본을 게시하세요.")
                 else: d.execute("UPDATE weeks SET published=1, published_at=? WHERE label=?", (db.now(), label)); flash(f"{label} 게시했습니다.")
             elif act == "backup_now":
                 from . import backup as _bk

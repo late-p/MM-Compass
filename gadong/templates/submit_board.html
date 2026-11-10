@@ -12,7 +12,7 @@
 .sb th{white-space:nowrap}.sb td:nth-child(4),.sb td:nth-child(5),.sb td.act{white-space:nowrap}.sb td.act{display:table-cell}.sb td.act form{display:inline}.sb td.act a{margin-right:6px}.sb td.act button{padding:5px 11px;font-size:12.5px;vertical-align:middle}
 </style>{% endblock %}{% block body %}<div class="sb">
 <div class="hd"><h1 style="margin:0">제출 현황</h1><select onchange="location='?week='+this.value">{% for k,t in wks %}<option value="{{ k }}" {{ 'selected' if k==wl }}>{{ t }}{{ ' (이번 주)' if loop.first }}</option>{% endfor %}</select></div>
-<div class="sub" style="margin-top:6px">{{ mon[5:]|replace('-','/') }} 월 ~ {{ thu[5:]|replace('-','/') }} 목 · 팀별 이번 주 투입계획 제출 상태 (사업부 단위로 올린 파일도 그 아래 팀의 제출로 봅니다) · <b>제출</b>은 [반영 확정]해야 재계산에 들어갑니다 · 변동없음 = 지난 반영본 그대로</div>
+<div class="sub" style="margin-top:6px">{{ mon[5:]|replace('-','/') }} 월 ~ {{ thu[5:]|replace('-','/') }} 목 · 팀별 이번 주 투입계획 제출 상태 (사업부 단위로 올린 파일도 그 아래 팀의 제출로 봅니다) · <b>제출</b>은 [반영 확정]해야 통계 집계에 들어갑니다 · 변동없음 = 지난 반영본 그대로</div>
 {% set n = rows|length %}
 <div class="card dlc"><b style="color:var(--navy)">업로드 마감</b>
 <form method="post"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="what" value="deadline"><input type="hidden" name="week" value="{{ wl }}">
@@ -35,7 +35,7 @@
 {% else %}<tr><td colspan="7" class="muted">제출 대상 팀이 없습니다. 아래 '제출 대상'에서 골라 주세요.</td></tr>{% endfor %}
 </tbody></table></div></div>
 
-<div class="card" id="hr"><h2>인사 변동 제출{% if n_open %} <em class="nbadge">{{ n_open }}</em>{% endif %} <span class="muted" style="font-size:12px;font-weight:400">'반영'으로 바꾸거나 관리자가 직접 입력한 변동은 다음 재계산부터 가동대상MM에 들어갑니다 · 인사자료에 이미 있으면 겹쳐서 빠지지 않습니다</span></h2>
+<div class="card" id="hr"><h2>인사 변동 제출{% if n_open %} <em class="nbadge">{{ n_open }}</em>{% endif %} <span class="muted" style="font-size:12px;font-weight:400">'반영'으로 바꾸거나 관리자가 직접 입력한 변동은 다음 통계 집계부터 가동대상MM에 들어갑니다 · 인사자료에 이미 있으면 겹쳐서 빠지지 않습니다</span></h2>
 <p style="margin:-4px 0 10px"><a href="?week={{ wl }}&hr=open#hr" style="{{ 'font-weight:700' if hr_f=='open' }}">처리할 것만</a> · <a href="?week={{ wl }}&hr=all#hr" style="{{ 'font-weight:700' if hr_f!='open' }}">전체</a></p>
 <details style="margin:0 0 14px" {{ 'open' if request.args.get('hr_open') }}><summary class="btn primary" style="list-style:none">+ 인사 변동 직접 입력</summary>
 <form method="post" action="{{ url_for('my_hr') }}" style="margin-top:10px"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="back" value="board"><input type="hidden" name="week" value="{{ wl }}">
@@ -49,7 +49,7 @@
 <td><form method="post"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="what" value="hr"><input type="hidden" name="week" value="{{ wl }}"><input type="hidden" name="id" value="{{ h['id'] }}">
 <select name="status">{% for s in HR_ST %}<option {{ 'selected' if s==h['status'] }}>{{ s }}</option>{% endfor %}</select> <input name="admin_note" placeholder="메모" value="{{ h['admin_note'] }}"> <button>저장</button></form></td></tr>
 {% else %}<tr><td colspan="8" class="muted">{{ '처리할 제출이 없습니다.' if hr_f=='open' else '제출 내역이 없습니다.' }}</td></tr>{% endfor %}</tbody></table></div>
-<p class="muted" style="margin:10px 0 0">접수·확인 = 아직 계산에 안 들어감 · 반영 = 다음 재계산부터 가동대상MM에 들어감 (관리자가 직접 입력한 건 바로 반영 상태) · 인사자료와 다름 = 제출 내용과 회사 자료가 달라 확인 필요</p></div>
+<p class="muted" style="margin:10px 0 0">접수·확인 = 아직 계산에 안 들어감 · 반영 = 다음 통계 집계부터 가동대상MM에 들어감 (관리자가 직접 입력한 건 바로 반영 상태) · 인사자료와 다름 = 제출 내용과 회사 자료가 달라 확인 필요</p></div>
 
 <details class="card"><summary style="cursor:pointer;color:var(--steel);font-weight:700">제출 대상 부서 {{ tdepts|length }}개 {{ '(직접 지정)' if custom else '(자동: 업로드 담당자 부서 + 최근 8주 제출 부서)' }} — 바꾸기</summary>
 <form method="post" style="margin-top:12px"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="what" value="depts"><input type="hidden" name="week" value="{{ wl }}">

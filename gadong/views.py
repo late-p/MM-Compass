@@ -94,7 +94,7 @@ def place_of(kind, dept, path):
     return f"투입계획 · {nm} (부서 파일, 하반기보다 우선)", None
 
 STATUS_CSS = {"확인 대기": "wait", "제출": "sub", "반영": "ok", "보류": "hold", "반려": "rej", "접수": "sub"}
-STATUS_HELP = {"확인 대기": "올린 사람이 미리보기를 확인하고 '제출'해야 합니다", "제출": "관리자 반영 확정을 기다립니다",
+STATUS_HELP = {"확인 대기": "미리보기를 확인한 뒤 '제출'해 주세요", "제출": "관리자 반영 확정을 기다립니다",
                "반영": "다음 재계산부터 계산에 들어갑니다", "보류": "계산에서 빠집니다", "반려": "계산에서 빠집니다"}
 
 def make_preview(uid):
@@ -313,7 +313,7 @@ def init_app(app):
         sel = request.args.get("week") or (weeks[0]["label"] if weeks else "")
         built = ""
         p = published_path(sel, "admin.html") if sel else None
-        if p: built = dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%m/%d %H:%M")
+        if p: built = dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y.%m.%d %H:%M")
         return render_template("admin_dashboard.html", weeks=weeks, sel=sel, built=built)
 
     @app.route("/admin/raw/<label>/<page>")

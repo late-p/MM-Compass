@@ -13,7 +13,7 @@
 {% elif pv.error %}<div class="card pv-red"><h2>파일을 읽지 못했습니다</h2><p>{{ pv.error }}</p><p class="muted">이 상태로는 반영하지 마세요. 파일을 확인해 다시 올리거나 삭제해 주세요.</p></div>
 {% else %}
 <div class="card"><h2>읽은 내용</h2>
-<p>양식: <b>{{ pv.fmt }}</b>{% if pv.place %} · 반영 자리: <b>{{ pv.place }}</b>{% endif %}{% if pv.dept %} · 부서: {{ pv.dept }}{% endif %}</p>
+{% if pv.fmt or pv.place or pv.dept %}<p>{% if pv.fmt %}양식: <b>{{ pv.fmt }}</b>{% endif %}{% if pv.place %} · 반영 자리: <b>{{ pv.place }}</b>{% endif %}{% if pv.dept %} · 부서: {{ pv.dept }}{% endif %}</p>{% endif %}
 {% if pv.prev_name %}<p class="muted">비교 대상(지금 쓰는 파일): {{ pv.prev_name }}</p>{% endif %}
 {% if pv.note %}<p class="muted">{{ pv.note }}</p>{% endif %}
 {% set MS = pv.months or ['10월','11월','12월'] %}{% if pv.read %}<table><thead><tr><th>읽은 팀</th><th class="num">인원</th>{% for m in MS %}<th class="num">{{ m }} 투입MM<br><small>지금 → 새 파일</small></th>{% endfor %}<th class="num">{{ MS[0] }} 가동률<br><small>이 파일 기준</small></th></tr></thead><tbody>
@@ -21,7 +21,7 @@
 {% for i in range(MS|length) %}{% set d = t.mm[i]-t.prev[i] %}<td class="num {{ 'up' if d > 0.005 else ('dn' if d < -0.005 else '') }}">{{ '%.2f'|format(t.prev[i]) }} → {{ '%.2f'|format(t.mm[i]) }}</td>{% endfor %}
 <td class="num">{% if t.rate[0] is not none %}{{ '%.1f'|format(t.rate[0]) }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table>{% endif %}</div>
 {% if pv.red %}<div class="card pv-red"><h2>꼭 확인할 것 {{ pv.red|length }}건</h2><ul>{% for x in pv.red %}<li>{{ x }}</li>{% endfor %}</ul></div>
-{% else %}<div class="card pv-ok"><h2>꼭 확인할 것 없음</h2><p class="muted">가동대상·1.00 초과·팀 가동률 100% 초과 문제가 없습니다.</p></div>{% endif %}
+{% else %}<div class="card pv-ok"><h2>꼭 확인할 것 없음</h2><p class="muted">가동대상, 1.00 초과, 팀 가동률 100% 초과 모두 이상 없습니다.</p></div>{% endif %}
 {% if pv.yellow %}<div class="card pv-yel"><h2>참고</h2><ul>{% for x in pv.yellow %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
 {% if pv.changes %}<div class="card pv-chg"><details open><summary><b>사람별 변화 {{ pv.changes|length }}명</b> <span class="muted">지금 쓰는 파일과 달라진 사람 · 대기·이행·제안·R&amp;D가 프로젝트별로 어떻게 바뀌었는지</span></summary>
 <table class="chg"><colgroup><col style="width:180px"><col style="width:140px"><col style="width:100px"><col>{% for m in MS %}<col style="width:120px">{% endfor %}</colgroup>
@@ -50,5 +50,5 @@
 {% if u['role'] == 'admin' or (r['user_id'] == u['id'] and r['status'] != '반영') %}
 <form method="post" action="{{ url_for('upload_delete', uid=r['id']) }}" onsubmit="return confirm('이 업로드를 삭제할까요? 원본 파일도 지워집니다.')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="danger">삭제 (잘못 올림)</button></form>{% endif %}
 </div>
-<p class="muted" style="margin-top:10px">반영 확정한 파일만 재계산에 들어갑니다. 재계산해도 '계산본 게시'를 누르기 전까지 회의용 화면은 바뀌지 않습니다.</p></div>
+<p class="muted" style="margin-top:10px">반영 확정한 파일만 재계산에 들어갑니다. 재계산 후 '게시'를 눌러야 회의용 화면이 바뀝니다.</p></div>
 {% endblock %}

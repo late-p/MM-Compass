@@ -272,7 +272,10 @@ btnRead.addEventListener('click',e=>{e.stopPropagation();const on=!pop.classList
 document.addEventListener('click',e=>{if(!pop.contains(e.target)&&e.target!==btnRead){pop.classList.remove('on');btnRead.setAttribute('aria-pressed',false)}});
 let userZ=1;
 function autoZ(){const w=window.innerWidth; if(w<=860)return 1; return Math.max(0.85,Math.min(1.3,(w-84)/1700))}
-function updZ(){document.documentElement.style.setProperty('--z',(userZ*autoZ()).toFixed(3))}
+function updZ(){const z=userZ*autoZ();document.documentElement.style.setProperty('--z',z.toFixed(3));
+  /* 아주 큰 화면(4K 등): 본문 폭에 상한을 두고 가운데로 */
+  const m=document.querySelector('.main');if(m){const MAXW=1900,rail=84;m.style.maxWidth=MAXW+'px';
+    const extra=window.innerWidth>860?Math.max(0,(window.innerWidth/z-rail-MAXW)/2):0;m.style.marginLeft=window.innerWidth>860?(rail+extra)+'px':''}}
 window.addEventListener('resize',updZ); updZ();
 function applySet(k,v){ if(k==='z'){userZ=parseFloat(v)||1;updZ()}
   if(k==='lh')document.documentElement.style.setProperty('--lh',v);

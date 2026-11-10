@@ -75,14 +75,15 @@ def _pmv(d, f):
 def _pmd(d, f):
     return dl(d[f][P9 - 1], d[f][P9], "%p") if P9 > 0 else ""
 def _pmc(c):
-    d = c["d"]; return f'<div class="pmc"><em>{E(c["name"])}</em> 가득 <b>{_pmv(d, "g"):.2f}%</b> · 가동 <b>{_pmv(d, "u"):.2f}%</b></div>'
+    d = c["d"]; return f'<div class="pmc"><em>{E(c["name"])}</em> <span class="y3i">가득 <b>{_pmv(d, "g"):.2f}%</b></span> <span class="y3i">가동 <b>{_pmv(d, "u"):.2f}%</b></span></div>'
 PM_GAUGE = (not PREV)   # 월 첫 주(전주 보고 없음)에는 전월 실적도 나침반으로 보여줌
 _pmg = ('<div class="pmg">' + GA.sized(GA.pair(min(_pmv(D, "u"), 100), min(_pmv(D, "g"), 100), None, None, "pmg", True), 300) + '</div>') if PM_GAUGE else ""
 _pmcls = " pm" if PM_GAUGE else ""
-year_html = (f'<div class="yr{_pmcls}">{_pmg}<div class="yl"><span>{ML_T} · 전사</span><br>가득률 <b>{_pmv(D, "g"):.2f}%</b> {_pmd(D, "g")} · 비매출 모수 제외 <b>{_pmv(D, "gn"):.2f}%</b> · 가동률 <b>{_pmv(D, "u"):.2f}%</b> {_pmd(D, "u")}</div>'
+year_html = (f'<div class="yr{_pmcls}">{_pmg}<div class="yl"><span>{ML_T} · 전사</span><br><span class="y3i">가득률 <b>{_pmv(D, "g"):.2f}%</b> {_pmd(D, "g")}</span> <span class="y3i">비매출 모수 제외 <b>{_pmv(D, "gn"):.2f}%</b></span> <span class="y3i">가동률 <b>{_pmv(D, "u"):.2f}%</b> {_pmd(D, "u")}</span></div>'
              f'<div class="yrr"><span>{ML_T} · 법인별</span>' + "".join(_pmc(c) for c in RT["corps"]) + '</div></div>')
-year3_html = (f'<div class="yr3"><div><span>연간(실적+예상)</span> 가득률 <b>{D["yg"]:.2f}%</b> · 비매출 모수 제외 가득률 <b>{D["yn"]:.2f}%</b> · 가동률 <b>{D["yu"]:.2f}%</b></div>'
-              f'<div><span>{X.RA} 실적</span> 가득률 <b>{D["cg"]:.2f}%</b> · 가동률 <b>{D["cu"]:.2f}%</b></div></div>')
+def _y3(label, items): return f'<div class="y3g"><span class="y3t">{label}</span>' + "".join(f'<span class="y3i">{k} <b>{v:.2f}%</b></span>' for k, v in items) + '</div>'
+year3_html = ('<div class="yr3">' + _y3("연간(실적+예상)", [("가득률", D["yg"]), ("가동률", D["yu"]), ("비매출 모수 제외 가득률", D["yn"])])
+              + _y3(f"{X.RA} 실적", [("가득률", D["cg"]), ("가동률", D["cu"])]) + '</div>')
 # 본부 목록 (요약·막대·표에서 같이 씀)
 HQS = [(c, h, K("h", c["name"], h["name"])) for c in RT["corps"] for h in c["hqs"]]
 def hq_label(c, h): return h["name"] if c["name"] == "아이티센클로잇" else f'엔텍 {h["name"]}'
@@ -272,7 +273,7 @@ def _prow(p):
     plan = X._next_plan(p)
     ps = (plan[0][1] + (f" 외 {len(plan)-1}건" if len(plan) > 1 else "")) if plan else (X.quit_txt(p) or "미정")
     if p.get("idle_note"): ps = str(p["idle_note"]).strip()
-    return (f'<tr data-a="{p["idle"][P9]:.4f}" data-b="{p["idle"][P10]:.4f}" data-mon="{sum(1 for v in p["idle"][:P10 + 1] if v >= 0.5)}" data-job="{E((p["직무"] or "").lower())}"{" data-exec=1" if p["exec"] else ""}><td class="l">{E(p["name"])}</td><td class="l">{X._org_br(E(p["org"]))}</td><td class="l">{E(p["직무"] or "—")}</td><td class="l">{E(p["직급"] or "—")}</td>'
+    return (f'<tr data-a="{p["idle"][P9]:.4f}" data-b="{p["idle"][P10]:.4f}" data-mon="{sum(1 for v in p["idle"][:P10 + 1] if v >= 0.5)}" data-job="{X.job_key(p["직무"])}"{" data-exec=1" if p["exec"] else ""}><td class="l">{E(p["name"])}</td><td class="l">{X._org_br(E(p["org"]))}</td><td class="l">{E(p["직무"] or "—")}</td><td class="l">{E(p["직급"] or "—")}</td>'
             + "".join(f'<td class="old {"na" if p["T"][m] <= 0.005 else ("z" if p["idle"][m] <= 0.005 else "")}">{"" if p["T"][m] <= 0.005 else "%.2f" % p["idle"][m]}</td>' for m in OLD)
             + "".join(f'<td class="{"na" if p["T"][m] <= 0.005 else ("z" if p["idle"][m] <= 0.005 else "")}{" cm" if m == P10 else ""}">{"" if p["T"][m] <= 0.005 else "%.2f" % p["idle"][m]}</td>' for m in IM)
             + f'<td class="l pj" title="{E(ps)}">{E(ps)}{X.trn_html(p)}</td><td><span class="st {st[1]}">{E(st[0])}</span></td></tr>')
@@ -513,8 +514,8 @@ const hdrs=[...sl.querySelectorAll('tr.tmh td, details>summary')];const orig=new
 const f2=v=>v.toFixed(2);
 function setH(h,rows){const sum=k=>rows.reduce((a,r)=>a+(+r.dataset[k]),0);const q=c=>h.querySelector(c);
  const a=q('.m9'),b=q('.m10'),n=q('.mn');if(a)a.textContent=f2(sum('a'));if(b)b.textContent=f2(sum('b'));if(n)n.textContent=rows.length;const cb=q('.cbbase');if(cb)cb.style.display='none'}
-function run(){const hideEx=!ex.checked,minM=+ld.value,q=jb?jb.value.trim().toLowerCase().replace(/\s+/g,''):'',act=hideEx||minM>0||!!q;
- const all=[...sl.querySelectorAll('tr[data-b]')];all.forEach(r=>r.classList.toggle('flt',act&&((hideEx&&!!r.dataset.exec)||(minM&&+r.dataset.mon<minM)||(q&&(r.dataset.job||'').replace(/\s+/g,'').indexOf(q)<0))));
+function run(){const hideEx=!ex.checked,minM=+ld.value,q=jb?jb.value:'',act=hideEx||minM>0||!!q;
+ const all=[...sl.querySelectorAll('tr[data-b]')];all.forEach(r=>r.classList.toggle('flt',act&&((hideEx&&!!r.dataset.exec)||(minM&&+r.dataset.mon<minM)||(q&&(r.dataset.job||'')!==q))));
  hdrs.forEach(h=>h.innerHTML=orig.get(h));
  sl.querySelectorAll('tr.tmh').forEach(t=>t.classList.remove('flt'));sl.querySelectorAll('details').forEach(d=>d.style.display='');
  if(!act)return;
@@ -707,6 +708,19 @@ CSS += r"""
 .whyf{margin-top:10px;font-size:12.5px;color:var(--muted)}
 """
 
+CSS += r"""
+/* 1110 디자인: 지표 묶음은 항목 단위로만 줄바꿈 */
+.y3i{white-space:nowrap;display:inline-block;margin-right:12px}.y3i:last-child{margin-right:0}
+.yr3{display:grid;grid-template-columns:1fr;gap:8px}
+.yr3 .y3g{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}.yr3 .y3t{font-weight:700;color:var(--navy);margin-right:2px;white-space:nowrap}.yr3 .y3i{margin-right:0;background:#F3F6FB;padding:3px 10px}
+.nw{white-space:nowrap}
+/* 본부 선택: 법인 줄·사업부별 줄의 시작 위치(라벨 칸)를 같게 */
+#gcards{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+#gcards .hqbk{margin:0 0 2px 0}
+#gcards .cgrp,#gsub{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;box-sizing:border-box}
+#gcards .cgl,#gsub .cgl{flex:0 0 112px;width:112px;margin:0;font-size:13px;font-weight:700;color:#4A5A70}
+#gsub{padding-left:0;margin:0 0 12px}
+"""
 CSS = CSS.replace("{IT_W}", IT_W).replace("{LV_W}", LV_W)
 import re as _re_fit
 CSS = _re_fit.sub(r"(\d*\.?\d+)vw", lambda m: "calc(var(--u,1vw)*" + m.group(1) + ")", CSS)   # 화면 비례 확대(fit)를 켜면 --u=0 으로 두어 이중 확대 방지
@@ -724,7 +738,7 @@ page = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name
 <section class="slide"><h2>월별 가득률 · 가동률 추이</h2><div class="sub">{X.RA} 실적 · {P10 + 1}월 당월{f' · {X._cf.R(P10 + 2)} 투입계획 기준 예상' if P10 < 11 else ''}{E(X.PROV_TXT)}</div>
 <div class="s3g"><div class="ycg"><div class="ycg-t">연간 추정</div>{GA.sized(GA.pair(min(D["yu"], 100), min(D["yg"], 100), None, None, "yy"), 440)}{GAP_W}</div><div class="s3m"><div class="chart-card" id="cc">{LG}{chart}<div class="tip" id="tip" hidden></div></div><div class="note">그래프의 각 달에 마우스를 올리면 수치와 전월 대비 증감이 나옵니다.</div>{mtab}{year3_html}</div></div><div class="corp-line">{corp_line}</div></section>
 {WHY_SLIDE}
-<section class="slide"><h2>대기 인력</h2><div class="fbar"><label><input type="checkbox" id="mex" checked> 사업부장 포함</label><label>직무 검색 <input type="search" id="mjob" placeholder="예: 개발, PM" autocomplete="off" style="width:150px"></label><label>대기 기간 <select id="mld"><option value="0">전체</option>{"".join(f'<option value="{k}">누적 {k}개월 이상</option>' for k in range(1, 7))}</select></label></div><div class="sub">{P9 + 1}월({"확정" if PM_OK else "잠정"}) 또는 {P10 + 1}월(당월) 대기가 있는 인원 {n_show}명 · 단위 MM · 법인 › 본부 › 사업부 › 팀 · 사업부를 누르면 사람이 펼쳐집니다 {('<button class="tg" id="idold">' + (f'1~{P9}월 펼치기' if P9 > 1 else '1월 펼치기') + '</button>') if K_OLD else ''}<button class="tg" id="idopen">사람까지 모두 펼치기</button><button class="tg" id="idclose">사업부까지만 보기</button></div>{idle_blocks}</section>
+<section class="slide"><h2>대기 인력</h2><div class="fbar"><label><input type="checkbox" id="mex" checked> 사업부장 포함</label><label>직무 {X.job_select("mjob", [p for p in PP.values() if _idle(p)])}</label><label>대기 기간 <select id="mld"><option value="0">전체</option>{"".join(f'<option value="{k}">누적 {k}개월 이상</option>' for k in range(1, 7))}</select></label></div><div class="sub">{P9 + 1}월({"확정" if PM_OK else "잠정"}) 또는 {P10 + 1}월(당월) 대기가 있는 인원 {n_show}명 · 단위 MM · 법인 › 본부 › 사업부 › 팀 · 사업부를 누르면 사람이 펼쳐집니다 {('<button class="tg" id="idold">' + (f'1~{P9}월 펼치기' if P9 > 1 else '1월 펼치기') + '</button>') if K_OLD else ''}<button class="tg" id="idopen">사람까지 모두 펼치기</button><button class="tg" id="idclose">사업부까지만 보기</button></div>{idle_blocks}</section>
 <section class="slide"><h2>인사 변동</h2>
 <h3 class="sh">변동 인원 <b>{len(X.HRE)}명</b><small>{P10 + 1}월 입사 · 퇴사 · 휴직 · 복직 · 전배 · 가동대상 영향</small></h3>
 <table class="hrt"><thead><tr><th>유형</th><th class="l">성명</th><th class="l">소속 (변동)</th><th class="l">직무</th><th class="l">직급</th><th>적용일</th><th class="l">가동대상 영향</th></tr></thead><tbody>{hr_rows}</tbody></table>

@@ -109,13 +109,16 @@
               <button>저장</button>
             </form>
           </td>
-          <td data-label="상태"><span class="users-cell-text"><span class="users-status {{ 'is-active' if r['active'] else 'is-inactive' }}">{{ '사용' if r['active'] else '중지' }}</span></span></td>
+          <td data-label="상태">
+            {% if r['id'] == g.user['id'] %}<span class="users-cell-text"><span class="users-status is-active">사용</span> <span class="muted">(본인)</span></span>
+            {% else %}<form method="post" class="users-status-form">{{ form_fields(none, r['id']) }}
+              <select name="act" class="users-status-select {{ 'is-active' if r['active'] else 'is-inactive' }}" aria-label="{{ r['username'] }} 상태" onchange="this.form.submit()"><option value="activate" {{ 'selected' if r['active'] }}>사용</option><option value="deactivate" {{ 'selected' if not r['active'] }}>사용중지</option></select>
+            </form>{% endif %}</td>
           <td data-label="관리" class="users-cell-wide">
             <div class="users-management">
               <form method="post" class="users-actions">
                 {{ form_fields(none, r['id']) }}
-                {% if r['active'] %}<button name="act" value="deactivate">사용 중지</button>{% else %}<button name="act" value="activate">다시 사용</button>{% endif %}
-                {% if r['id'] != g.user['id'] %}<button name="act" value="delete" class="users-delete" data-confirm="{{ r['username'] }} 계정을 삭제할까요?&#10;삭제하면 되돌릴 수 없습니다. (이 계정이 올린 파일·기록은 남습니다)" onclick="return confirm(this.dataset.confirm)">삭제</button>{% endif %}
+                                {% if r['id'] != g.user['id'] %}<button name="act" value="delete" class="users-delete" data-confirm="{{ r['username'] }} 계정을 삭제할까요?&#10;삭제하면 되돌릴 수 없습니다. (이 계정이 올린 파일·기록은 남습니다)" onclick="return confirm(this.dataset.confirm)">삭제</button>{% endif %}
               </form>
               <form method="post" class="users-control-pair">
                 {{ form_fields('reset', r['id']) }}

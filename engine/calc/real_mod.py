@@ -465,13 +465,34 @@ def _s1():
   </section>'''
 
 # ---- 02 인사 변동 (당월) ----
+# ---- 직무 드롭다운: 같은 직무인데 표기가 갈린 것은 하나로 묶음 (표시 이름 기준) ----
+JOB_MAP = {"개발": "개발 · Programming", "programming": "개발 · Programming", "pm": "PM"}
+def job_canon(j):
+    j = (j or "").strip()
+    return JOB_MAP.get(j.lower(), j)
+def job_key(j):
+    import html as _h
+    return _h.escape(re.sub(r"\s+", "", job_canon(j)).lower(), quote=True)
+def job_select(el_id, persons, style="width:170px"):
+    import html as _h
+    seen = {}
+    for p in persons:
+        c = job_canon(p.get("직무"))
+        if c: seen.setdefault(job_key(p.get("직무")), c)
+    opts = "".join(f'<option value="{k}">{_h.escape(v)}</option>' for k, v in sorted(seen.items(), key=lambda kv: kv[1].lower()))
+    return f'<select id="{el_id}" style="{style}"><option value="">전체 직무</option>{opts}</select>'
+
 def _org_cell(h, esc=lambda x: x):
     """인사 변동 소속 칸: 전배처럼 '이전 → 이후'가 길면 화살표까지만 윗줄, 이후 소속은 아랫줄 전체"""
     full = f'{h["corp"]} · {h["org"]}'
+    def nw(t):   # 법인·사업부·팀 이름은 중간에 끊기지 않게 한 덩어리로 (줄은 ' · ' 자리에서만 바뀜)
+        return " · ".join(f'<span class="nw">{esc(x)}</span>' for x in t.split(" · "))
     if " → " in full and len(full) > 60:
         a, b = full.split(" → ", 1)
-        return esc(a) + " →<br>" + esc(b)
-    return esc(full)
+        return nw(a) + " →<br>" + nw(b)
+    if " → " in full:
+        return " → ".join(nw(x) for x in full.split(" → "))
+    return nw(full)
 def _org_br(s):
     """사업부 이름 'AX Consulting & Eng 사업부'는 Eng 앞에서 줄바꿈"""
     return s.replace("&amp; Eng 사업부", "&amp;<br>Eng 사업부").replace("& Eng 사업부", "&<br>Eng 사업부")
@@ -731,7 +752,7 @@ def _s4():
             plan = _next_plan(p)
             plan_s = (f'{plan[0][1]} ({MON[plan[0][0]]}~)' if plan[0][0] > CUR else plan[0][1]) + (f' 외 {len(plan)-1}건' if len(plan) > 1 else "") if plan else (quit_txt(p) or "미정")
             plan_t = " / ".join(n for _, n, _ in plan)
-            return f'<tr{" data-leave=1" if lv else ""}{" data-cur0=1" if _quiet(p) else ""} data-name="{p["name"]}" data-job="{(p["직무"] or "").lower()}"{" data-exec=1" if p["exec"] else ""} data-mon="{sum(1 for v in p["idle"][:CUR + 1] if v >= 0.5)}" data-h1="{sum(p["idle"][:CUR]):.4f}" data-hp="{p["idle"][CUR - 1]:.4f}" data-hc="{p["idle"][CUR]:.4f}" data-need="{(p["idle"][CUR] if st[0] == "미투입" and not lv else 0):.4f}" data-idle="{sum(p["idle"][CUR:12]):.4f}" data-year="{sum(p["idle"]):.4f}"><td class="l">{p["name"]} {tag}{badge}</td><td class="l">{p["org"]}</td><td class="l">{p["직무"] or "—"}</td><td class="l">{p["직급"] or "—"}</td>{cells}<td class="strong">{sum(p["idle"]):.2f}</td><td class="l plan" title="{plan_t}">{plan_s}{trn_html(p)}</td><td class="c"><span class="pill {st[1]}">{st[0]}</span></td></tr>'
+            return f'<tr{" data-leave=1" if lv else ""}{" data-cur0=1" if _quiet(p) else ""} data-name="{p["name"]}" data-job="{job_key(p["직무"])}"{" data-exec=1" if p["exec"] else ""} data-mon="{sum(1 for v in p["idle"][:CUR + 1] if v >= 0.5)}" data-h1="{sum(p["idle"][:CUR]):.4f}" data-hp="{p["idle"][CUR - 1]:.4f}" data-hc="{p["idle"][CUR]:.4f}" data-need="{(p["idle"][CUR] if st[0] == "미투입" and not lv else 0):.4f}" data-idle="{sum(p["idle"][CUR:12]):.4f}" data-year="{sum(p["idle"]):.4f}"><td class="l">{p["name"]} {tag}{badge}</td><td class="l">{p["org"]}</td><td class="l">{p["직무"] or "—"}</td><td class="l">{p["직급"] or "—"}</td>{cells}<td class="strong">{sum(p["idle"]):.2f}</td><td class="l plan" title="{plan_t}">{plan_s}{trn_html(p)}</td><td class="c"><span class="pill {st[1]}">{st[0]}</span></td></tr>'
 
         hnode = next(h for c in RT["corps"] if c["name"] == cn for h in c["hqs"] if h["name"] == hq)
         order = [(dv["name"], t["raw"], t["name"], dv["name"]) for dv in hnode["divs"] for t in dv["teams"]]
@@ -781,7 +802,7 @@ def _s4():
       <button role="tab" aria-selected="false" data-f="entec">아이티센엔텍</button>
       <span class="tools">{f'<button data-fold="1" aria-pressed="false">1~{CUR - 1}월 펼치기</button>' if CUR > 1 else ''}<button data-act="csv">엑셀 다운로드</button><button data-act="open">모두 펼치기</button><button data-act="close">모두 접기</button></span>
     </div>
-    <div class="sort-bar"><em>정렬</em><button data-sort="name" aria-pressed="true">이름순</button><button data-sort="idle" aria-pressed="false">{RQ} 대기 많은순</button><button data-sort="year" aria-pressed="false">연간 대기 많은순</button><label class="lv-toggle"><input type="checkbox" id="cur0Show"> {PM}월(전월)·{CM}월(당월) 대기 없는 인원도 표시</label><label class="lv-toggle"><input type="checkbox" id="lvShow" checked> 휴직·퇴사자 포함</label><label class="lv-toggle"><input type="checkbox" id="exShow" checked> 사업부장 포함</label><label class="lv-toggle">직무 검색 <input type="search" id="jobQ" placeholder="예: 개발, PM" autocomplete="off" style="width:150px"></label><label class="lv-toggle">대기 기간 <select id="ldSel"><option value="0">전체</option><option value="1">누적 1개월 이상</option><option value="2">누적 2개월 이상</option><option value="3">누적 3개월 이상</option><option value="4">누적 4개월 이상</option><option value="5">누적 5개월 이상</option><option value="6">누적 6개월 이상</option></select></label><span class="grp-toggle"><em>팀 묶음</em><button data-g="open">모두 펼치기</button><button data-g="close">모두 접기</button></span></div>
+    <div class="sort-bar"><em>정렬</em><button data-sort="name" aria-pressed="true">이름순</button><button data-sort="idle" aria-pressed="false">{RQ} 대기 많은순</button><button data-sort="year" aria-pressed="false">연간 대기 많은순</button><label class="lv-toggle"><input type="checkbox" id="cur0Show"> {PM}월(전월)·{CM}월(당월) 대기 없는 인원도 표시</label><label class="lv-toggle"><input type="checkbox" id="lvShow" checked> 휴직·퇴사자 포함</label><label class="lv-toggle"><input type="checkbox" id="exShow" checked> 사업부장 포함</label><label class="lv-toggle">직무 {job_select("jobQ", [p for g in groups for p in g[2]])}</label><label class="lv-toggle">대기 기간 <select id="ldSel"><option value="0">전체</option><option value="1">누적 1개월 이상</option><option value="2">누적 2개월 이상</option><option value="3">누적 3개월 이상</option><option value="4">누적 4개월 이상</option><option value="5">누적 5개월 이상</option><option value="6">누적 6개월 이상</option></select></label><span class="grp-toggle"><em>팀 묶음</em><button data-g="open">모두 펼치기</button><button data-g="close">모두 접기</button></span></div>
     <div class="note st-legend">상태: <b>미투입</b> {RQ} 계속 대기 (투입 0) · 헤더의 「연말까지 투입 없음」 = 이 상태 인원의 {CM}월 대기 MM · <b>부분 투입</b> 투입은 있으나 1.00 미만{f' · <b>투입 예정</b> {CM}월 대기 후 12월엔 투입 · <b>종료 후 대기</b> {CM}월 투입, 이후 대기 예정' if CM < 12 else ''} · <b>{CM}월 투입</b> {PM}월 대기 후 {CM}월부터 투입 · <b>비매출 모수</b> 사업부장</div>
     <div class="note st-legend st-legend2"><span class="leave-tag lt-quit">퇴사</span> <span class="leave-tag lt-leave">휴직</span> {CM}월 가동대상 0 (휴직·퇴사 전 달의 대기는 실적이므로 합계에 포함)</div>
     <div id="idle" class="hide-cur0" data-search>{html_g}
@@ -1170,9 +1191,9 @@ ORG_JS = ORG_JS + r"""
   box.querySelectorAll('details.grp .gv').forEach(e=>orig.set(e,e.innerHTML));
   const f2=v=>v.toFixed(2);
   function apply(){
-    const hideEx=ex&&!ex.checked, minM=ld?+ld.value:0, q=jq?jq.value.trim().toLowerCase().replace(/\s+/g,''):'', active=hideEx||minM>0||!!q;
+    const hideEx=ex&&!ex.checked, minM=ld?+ld.value:0, q=jq?jq.value:'', active=hideEx||minM>0||!!q;
     const rows=[...box.querySelectorAll('tr[data-name]')];
-    rows.forEach(r=>r.classList.toggle('flt',!!((hideEx&&r.dataset.exec)||(minM&&(+r.dataset.mon<minM))||(q&&(r.dataset.job||'').replace(/\s+/g,'').indexOf(q)<0))));
+    rows.forEach(r=>r.classList.toggle('flt',!!((hideEx&&r.dataset.exec)||(minM&&(+r.dataset.mon<minM))||(q&&(r.dataset.job||'')!==q))));
     if(q) box.querySelectorAll('details.grp').forEach(d=>{if([...d.querySelectorAll('tr[data-name]')].some(r=>!r.classList.contains('flt'))) d.open=true});
     if(!active){orig.forEach((h,e)=>e.innerHTML=h); return}
     const A={conf:[0,0],all:[0,0],cl:[0,0],et:[0,0],need:[0,0]};
@@ -1240,6 +1261,28 @@ ORG_CSS = ORG_CSS + """
   .kg{display:flex;justify-content:center;margin:2px 0 4px}.kg svg{display:block}
   td.mg,th.mg{width:46px;padding:2px 3px!important;text-align:center}td.mg svg{display:block;margin:0 auto}#s1 .row2 .panel:first-child th,#s1 .row2 .panel:first-child td{padding-left:7px!important;padding-right:7px!important}
   tfoot span.rise{color:#F6C9A2!important}tfoot span.fall{color:#A9E3C4!important}
+  /* 1110 디자인: 이름·날짜 문구는 중간에서 끊기지 않게 */
+  .nw{white-space:nowrap}
+  .od-idle table td .leave-tag,.od-idle table td .exec-tag,.leave-tag,.exec-tag{white-space:nowrap!important;word-break:keep-all}
+  #idle td .leave-tag,#idle td .exec-tag{white-space:nowrap!important}
+"""
+
+ORG_JS = ORG_JS + r"""
+// ---- 1110: 비매출 모수 명단 표가 칸 폭 계산 뒤에 오른쪽이 비면 컨테이너 폭까지 비례해서 채움 ----
+(function(){
+  function stretch(){
+    document.querySelectorAll('table.np-tab').forEach(function(t){
+      if(!t.offsetParent) return;
+      var sc=t.parentNode, cs=getComputedStyle(sc), inner=sc.clientWidth-parseFloat(cs.paddingLeft||0)-parseFloat(cs.paddingRight||0);
+      var cg=t.querySelector(':scope>colgroup'); if(!cg||inner<=0) return;
+      var cols=[].slice.call(cg.children); var tot=0; cols.forEach(function(c){tot+=parseFloat(c.style.width)||0});
+      if(!tot||inner-tot<4||t.dataset.npw==String(Math.round(inner))&&Math.abs(t.offsetWidth-inner)<3) return;
+      var k=inner/tot; cols.forEach(function(c){c.style.width=(parseFloat(c.style.width)*k).toFixed(1)+'px'});
+      t.style.width=inner+'px'; t.style.minWidth=inner+'px'; t.dataset.npw=String(Math.round(inner));
+    });
+  }
+  setInterval(stretch,700); window.addEventListener('resize',function(){setTimeout(stretch,400)});
+})();
 """
 
 # ORDER_V1

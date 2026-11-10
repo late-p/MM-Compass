@@ -73,7 +73,7 @@ def main(storage, uid):
     path = os.path.join(storage, "uploads", u["stored_name"])
     res = dict(id=uid, name=u["orig_name"], kind=u["kind"], at=dt.datetime.now().strftime("%Y-%m-%d %H:%M"), read=[], red=[], yellow=[], changes=[], note="")
     if u["kind"] != "plan":
-        res["note"] = "투입계획이 아닌 파일은 재계산 때 전체를 다시 읽습니다. (미리보기는 투입계획만)"
+        res["note"] = "투입계획이 아닌 파일은 미리보기를 지원하지 않습니다. 재계산할 때 전체를 읽어 반영합니다."
         return res
     fmt = RL.detect_format(path)
     dept = u["dept"] or RL.infer_dept(u["orig_name"], fmt) or ""

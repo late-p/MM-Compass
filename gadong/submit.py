@@ -15,7 +15,7 @@ from . import org as ORG
 HR_KINDS = ["입사", "퇴사", "휴직", "복직", "조직이동", "기타"]
 HR_ST = ["접수", "확인", "반영", "인사자료와 다름"]
 HR_HELP = {"접수": "관리자가 아직 보지 않았습니다", "확인": "관리자가 확인했습니다 (반영으로 바꾸면 계산에 들어갑니다)",
-           "반영": "다음 통계 집계부터 가동대상MM에 반영됩니다", "인사자료와 다름": "회사 인사자료와 달라 확인이 필요합니다"}
+           "반영": "다음 재계산부터 가동대상MM에 반영됩니다", "인사자료와 다름": "회사 인사자료와 달라 확인이 필요합니다"}
 # 제출 상태 (이번 주 · 부서 기준) → (화면 이름, css)
 ST_VIEW = {"미제출": ("미제출", "rej"), "확인 대기": ("작성 중", "wait"), "제출": ("제출", "sub"), "변동없음": ("변동없음 제출", "sub"),
            "반영": ("반영", "ok"), "보류": ("보류", "hold"), "반려": ("반려 · 다시 제출", "rej"), "일부": ("일부 제출", "wait")}
@@ -272,7 +272,7 @@ def init_app(app):
                    f.get("memo", "").strip()[:300], "반영" if u["role"] == "admin" else "접수", _now(), _now())).fetchone()[0]
         d.commit(); db.audit(u["username"], "hr_note", f"{dept} · {name} · {kind} · {date}")
         if u["role"] == "admin" and f.get("back") == "board":
-            flash(f"{name} · {kind} · {date} 제출을 저장했습니다. 다음 통계 집계부터 가동대상MM에 반영됩니다."); return redirect(url_for("submit_board", week=f.get("week", "")) + "#hr")
+            flash(f"{name} · {kind} · {date} 제출을 저장했습니다. 다음 재계산부터 가동대상MM에 반영됩니다."); return redirect(url_for("submit_board", week=f.get("week", "")) + "#hr")
         return redirect(url_for("my_home", dept=dept, hr_ok=nid) + "#hr")
 
     @app.route("/my/hr/<int:nid>/delete", methods=["POST"])

@@ -1,10 +1,10 @@
-{% extends "base.html" %}{% block title %}MM-Compass · 주차·통계 집계·게시{% endblock %}{% block head %}{% if running and not config.REMOTE_FILES %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}{% block body %}
-<h1>주차 · 통계 집계 · 게시</h1>
-<div class="sub">① 담당자 업로드 → ② <b>통계 집계</b> (몇 분) → ③ 집계본 미리보기·점검 목록 확인 → ④ <b>집계본 게시</b> → 회의용 화면에 반영 · 주차는 그 주 목요일 기준, 다음 주 월요일 회의</div>
-{% if pending %}<div class="card pv-yel"><b>반영 확정을 기다리는 업로드 {{ pending }}건</b> — <a href="{{ url_for('upload') }}">업로드 목록</a>에서 미리보기를 확인하고 '반영 확정'해 주세요.<br><span class="muted">※ '반영 확정'된 내역만 통계 집계 대상에 포함되며, [통계 집계] 후 [게시]를 완료해야 회의용 대시보드에 반영됩니다.</span></div>{% endif %}
+{% extends "base.html" %}{% block title %}MM-Compass · 주차·재계산·게시{% endblock %}{% block head %}{% if running and not config.REMOTE_FILES %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}{% block body %}
+<h1>주차 · 재계산 · 게시</h1>
+<div class="sub">① 담당자 업로드 → ② <b>재계산</b> (몇 분) → ③ 계산본 미리보기·점검 목록 확인 → ④ <b>계산본 게시</b> → 회의용 화면에 반영 · 주차는 그 주 목요일 기준, 다음 주 월요일 회의</div>
+{% if pending %}<div class="card pv-yel"><b>반영 확정을 기다리는 업로드 {{ pending }}건</b> — <a href="{{ url_for('upload') }}">업로드 목록</a>에서 미리보기를 보고 '반영 확정'해야 재계산에 들어갑니다.</div>{% endif %}
 {% if not has_cur %}<div class="card"><form method="post" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <b>{{ cur[1] }}</b> <span class="muted">({{ cur[0] }})</span> 주차가 아직 없습니다. <button name="act" value="new" class="primary" {{ 'disabled' if running }}>이번 주차 계산 시작</button></form></div>{% endif %}
-<div class="card"><table><thead><tr><th>주차</th><th>통계 집계</th><th>새 집계본</th><th>게시본 (회의용)</th><th>작업</th></tr></thead><tbody>
+<div class="card"><table><thead><tr><th>주차</th><th>재계산</th><th>새 계산본</th><th>게시본 (회의용)</th><th>작업</th></tr></thead><tbody>
 {% for r in rows %}{% set i = info[r['label']] %}{% set s = i.st %}<tr>
 <td><b>{{ r['title'] }}</b><br><span class="muted">{{ r['label'] }}</span></td>
 <td>{% if s.state == 'running' %}<span class="st st-접수">계산 중</span> <span class="muted" {% if config.REMOTE_FILES %}data-job-run="{{ url_for('advance_job', label=r['label']) }}" data-csrf="{{ csrf_token() }}"{% endif %}>{{ s.step }}</span>
@@ -18,13 +18,13 @@
 {% if i.pub %}<br><a href="{{ url_for('admin_raw', label=r['label'], page='meeting.html') }}" target="_blank">게시본 보기</a>{% endif %}</td>
 <td><form method="post" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="label" value="{{ r['label'] }}">
 {% if config.REMOTE_FILES and s.state=='running' %}<button name="act" value="cancel">계산 취소</button>{% endif %}
-<button name="act" value="rebuild" {{ 'disabled' if running }}>통계 집계</button>
-{% if i.draft and s.state == 'done' %}<button name="act" value="publish_draft" class="primary">집계본 게시</button>{% endif %}
+<button name="act" value="rebuild" {{ 'disabled' if running }}>재계산</button>
+{% if i.draft and s.state == 'done' %}<button name="act" value="publish_draft" class="primary">계산본 게시</button>{% endif %}
 {% if r['published'] %}<button name="act" value="unpublish">게시 내리기</button>{% elif i.pub %}<button name="act" value="publish">다시 게시</button>{% endif %}</form></td></tr>
 {% else %}<tr><td colspan="5" class="muted">주차가 없습니다.</td></tr>{% endfor %}</tbody></table>
 {% if running %}<p class="muted">{% if config.REMOTE_FILES %}이 화면을 열어 두면 단계별로 계산합니다. 연결이 끊겨도 완료한 단계는 저장되며, 이 화면으로 돌아오면 이어집니다.{% else %}계산 중에는 10초마다 이 화면이 새로고침됩니다.{% endif %}</p>{% endif %}</div>
 {% if not config.DATABASE_URL %}<div class="card"><h2>백업</h2>
-<p class="muted" style="margin-top:0">계정 · 업로드 원본 · 게시본 · 기본 입력 파일을 zip으로 저장합니다. <b>하루 1번 자동</b>(사이트가 켜져 있을 때) + <b>집계본 게시 직후</b> · 최근 30개 보관 · 백업 파일에도 인사정보가 들어 있으니 외부 공유 금지</p>
+<p class="muted" style="margin-top:0">계정 · 업로드 원본 · 게시본 · 기본 입력 파일을 zip으로 저장합니다. <b>하루 1번 자동</b>(사이트가 켜져 있을 때) + <b>계산본 게시 직후</b> · 최근 30개 보관 · 백업 파일에도 인사정보가 들어 있으니 외부 공유 금지</p>
 <form method="post" class="row"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <div style="flex:3"><label>백업 폴더 <span class="muted">(PC가 고장 나도 남도록 다른 드라이브·개인 네트워크 폴더 권장 · 비우면 기본 위치)</span></label><input name="path" value="{{ bk.dir }}" style="max-width:none"></div>
 <div style="flex:0 0 auto"><button name="act" value="backup_dir">폴더 저장</button> <button name="act" value="backup_now" class="primary">지금 백업</button></div></form>

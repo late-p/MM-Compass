@@ -1,4 +1,4 @@
-"""업로드 반영 미리보기 — 통계 집계 전에, 올린 파일에서 무엇을 읽었는지와 이상한 점을 보여 준다
+"""업로드 반영 미리보기 — 재계산 전에, 올린 파일에서 무엇을 읽었는지와 이상한 점을 보여 준다
 
 사용: python -m engine.preview <storage> <upload_id>   (사이트 폴더에서 실행)
 결과: storage/previews/<upload_id>.json
@@ -73,7 +73,7 @@ def main(storage, uid):
     path = os.path.join(storage, "uploads", u["stored_name"])
     res = dict(id=uid, name=u["orig_name"], kind=u["kind"], at=dt.datetime.now().strftime("%Y-%m-%d %H:%M"), read=[], red=[], yellow=[], changes=[], note="")
     if u["kind"] != "plan":
-        res["note"] = "투입계획이 아닌 파일은 미리보기를 지원하지 않습니다. 통계 집계할 때 전체를 읽어 반영합니다."
+        res["note"] = "투입계획이 아닌 파일은 미리보기를 지원하지 않습니다. 재계산할 때 전체를 읽어 반영합니다."
         return res
     fmt = RL.detect_format(path)
     dept = u["dept"] or RL.infer_dept(u["orig_name"], fmt) or ""
@@ -89,7 +89,7 @@ def main(storage, uid):
     os.environ["GADONG_CFG"] = work + "cfg.json"; sys.path.insert(0, CALC)
     import plan
     global MON; MON = [f"{m}월" for m in plan.QM]
-    # 가동대상 (가장 최근 통계 집계 결과) — 같은 이름이 여러 명이면 사번·팀으로 구분해 "이름 (팀)"으로 따로 다룸
+    # 가동대상 (가장 최근 재계산 결과) — 같은 이름이 여러 명이면 사번·팀으로 구분해 "이름 (팀)"으로 따로 다룸
     global PKEY
     tgt = None; _dup = {}
     cands = sorted(glob.glob(os.path.join(storage, "work", "*", "use_target.pkl")), key=os.path.getmtime)
@@ -207,7 +207,7 @@ def main(storage, uid):
         idle = [nm for nm, x in tgt.items() if x["team"] in teams and sum(x["T"]) > 0.005 and nm not in new and nm in listed]
         if idle: res["yellow"].append("파일에 대기(미투입)로 적힌 사람: " + ", ".join(idle[:30]))
     else:
-        res["yellow"].append("아직 통계 집계한 적이 없어 가동대상과의 대조는 생략했습니다.")
+        res["yellow"].append("아직 재계산한 적이 없어 가동대상과의 대조는 생략했습니다.")
     for nm in list(new) + [g for g in old if g not in new]:
         a = [round(v, 2) for v in new.get(nm, {"q": [0] * len(MON)})["q"]]; b = [round(v, 2) for v in old.get(nm, {"q": [0] * len(MON)})["q"]]
         ni = (new.get(nm) or {}).get("items", {}); oi = (old.get(nm) or {}).get("items", {})

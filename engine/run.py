@@ -1,4 +1,4 @@
-"""통계 집계 엔진 — 업로드된 파일(없으면 기본 파일)로 관리자·회의용 화면을 다시 만든다
+"""재계산 엔진 — 업로드된 파일(없으면 기본 파일)로 관리자·회의용 화면을 다시 만든다
 
 흐름
  1) 자리(role)별 입력 파일 정하기: 그 주차까지 올라온 업로드 중 최신(반려·보류 제외) → 없으면 storage/inputs/base
@@ -125,7 +125,7 @@ def sold_act(path, cur):
     except Exception:
         return cur - 1
 
-# ---- 통계 집계 실패 원인 안내 ----
+# ---- 재계산 실패 원인 안내 ----
 STEP_FILES = {   # 단계 → 그 단계가 읽는 자리
     "make_target.py": ["target_clo", "target_et", "hr", "stats_base"],
     "make_perf2.py": ["sold_clo", "stats_base"], "make_perf_et.py": ["sold_et", "stats_base"],
@@ -137,9 +137,9 @@ def _explain(err):
     import re as _re
     e = err.strip()
     if "투입계획 파일을 읽지 못했습니다" in e:
-        return e.split("RuntimeError: ")[-1], "그 파일을 열어 시트 이름·머리글(성명, 1월~12월 등)이 바뀌었는지 확인하고, 고친 파일을 다시 올리거나 그 업로드를 보류/삭제한 뒤 통계 집계하세요."
+        return e.split("RuntimeError: ")[-1], "그 파일을 열어 시트 이름·머리글(성명, 1월~12월 등)이 바뀌었는지 확인하고, 고친 파일을 다시 올리거나 그 업로드를 보류/삭제한 뒤 재계산하세요."
     if "PermissionError" in e:
-        return "파일을 열 수 없습니다 (다른 프로그램이 사용 중)", "엑셀에서 storage 안의 파일을 열어 두었다면 닫고 다시 통계 집계하세요."
+        return "파일을 열 수 없습니다 (다른 프로그램이 사용 중)", "엑셀에서 storage 안의 파일을 열어 두었다면 닫고 다시 재계산하세요."
     m = _re.search(r"Worksheet named '(.+?)' not found|Worksheet (.+?) does not exist|sheet '?(.+?)'? (?:not found|does not exist)", e)
     if m:
         return f"'{next(x for x in m.groups() if x)}' 시트를 찾지 못했습니다", "그 단계에서 쓰는 파일의 시트 이름이 바뀌었는지 확인하세요. 원래 이름으로 고쳐 다시 올리면 됩니다."
@@ -151,7 +151,7 @@ def _explain(err):
     if "BadZipFile" in e or "not a zip file" in e or "InvalidFileException" in e:
         return "엑셀 파일이 손상되었거나 엑셀 형식이 아닙니다", "엑셀에서 열어 '다른 이름으로 저장 → Excel 통합 문서(.xlsx)'로 저장한 뒤 다시 올리세요."
     if "MemoryError" in e:
-        return "메모리가 부족합니다", "다른 프로그램을 닫고 다시 통계 집계하세요."
+        return "메모리가 부족합니다", "다른 프로그램을 닫고 다시 재계산하세요."
     if "StopIteration" in e or "ValueError" in e or "IndexError" in e:
         return "파일에서 기대한 위치에 내용이 없습니다", "그 단계에서 쓰는 파일의 양식(머리글 줄, 시트 구성)이 평소와 다른지 확인하세요."
     return "예상하지 못한 오류", "아래 기술 로그를 캡처해서 Claude에게 보내 주세요."
@@ -370,7 +370,7 @@ def _job(storage, label, user):
     except subprocess.TimeoutExpired as e:
         log.append(traceback.format_exc())
         _set(storage, label, state="error", finished=dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), msg="계산이 30분 넘게 끝나지 않아 멈췄습니다.",
-             cause="시간 초과", hint="PC가 바쁘거나 파일이 아주 큰 경우입니다. 다른 프로그램을 닫고 다시 통계 집계해 보세요.", files=[])
+             cause="시간 초과", hint="PC가 바쁘거나 파일이 아주 큰 경우입니다. 다른 프로그램을 닫고 다시 재계산해 보세요.", files=[])
     except Exception as e:
         log.append(traceback.format_exc())
         c, h = _explain(f"{type(e).__name__}: {e}")
@@ -381,10 +381,10 @@ def _job(storage, label, user):
         _lock.release()
 
 def rebuild(storage, label, user="admin", wait=False):
-    """통계 집계 시작. (시작됐는지, 메시지)"""
+    """재계산 시작. (시작됐는지, 메시지)"""
     if not re.fullmatch(r"\d{4}-\d{2}-W\d", label): return False, "주차 형식이 올바르지 않습니다."
-    if not _lock.acquire(blocking=False): return False, "다른 통계 집계가 진행 중입니다. 끝난 뒤 다시 눌러 주세요."
+    if not _lock.acquire(blocking=False): return False, "다른 재계산이 진행 중입니다. 끝난 뒤 다시 눌러 주세요."
     _set(storage, label, state="running", step="준비", started=dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), finished="", msg="", cause="", hint="", files=[], by=user)
     t = threading.Thread(target=_job, args=(storage, label, user), daemon=True); t.start()
     if wait: t.join()
-    return True, "통계 집계를 시작했습니다. 몇 분 걸립니다. 이 화면에서 진행 상황을 볼 수 있습니다."
+    return True, "재계산을 시작했습니다. 몇 분 걸립니다. 이 화면에서 진행 상황을 볼 수 있습니다."

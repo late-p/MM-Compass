@@ -36,6 +36,6 @@ def register(app):
             json.dump(new, open(_path(), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
             files.persist(_path())
             db.audit(g.user["username"], "targets", f"전체 {a} · 비매출 제외 {n}")
-            flash("목표 가득률을 저장했습니다. 다음 통계 집계부터 회의용 화면에 반영됩니다.")
+            flash("목표 가득률을 저장했습니다. 다음 재계산부터 회의용 화면에 반영됩니다.")
             return redirect(url_for("targets"))
         return render_template("targets.html", t=t)

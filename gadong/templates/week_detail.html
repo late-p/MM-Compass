@@ -1,16 +1,16 @@
 {% extends "base.html" %}{% block title %}MM-Compass · {{ meta.title }}{% endblock %}{% block body %}
 <h1>{{ meta.title }} <span class="muted" style="font-size:14px">{{ label }} · {{ meta.meet }}</span></h1>
 {% if config.REMOTE_FILES and st.state=='running' %}<div class="card"><p data-job-run="{{ url_for('advance_job', label=label) }}" data-csrf="{{ csrf_token() }}">{{ st.step }}</p>이 화면을 열어 두면 계산이 이어집니다.</div>{% endif %}
-<div class="sub"><a href="{{ url_for('weeks') }}">← 주차 목록</a>{% if draft %} · 새 집계본: <a href="{{ url_for('admin_draft', label=label, page='meeting.html') }}" target="_blank">회의용</a> · <a href="{{ url_for('admin_draft', label=label, page='admin.html') }}" target="_blank">관리자</a>{% endif %}
+<div class="sub"><a href="{{ url_for('weeks') }}">← 주차 목록</a>{% if draft %} · 새 계산본: <a href="{{ url_for('admin_draft', label=label, page='meeting.html') }}" target="_blank">회의용</a> · <a href="{{ url_for('admin_draft', label=label, page='admin.html') }}" target="_blank">관리자</a>{% endif %}
 {% if inp %} · 계산 {{ inp.at }} ({{ inp.by }}){% endif %}</div>
-{% if st.state == 'error' %}<div class="card pv-red"><h2>통계 집계가 멈췄습니다</h2>
+{% if st.state == 'error' %}<div class="card pv-red"><h2>재계산이 멈췄습니다</h2>
 <table class="errt"><tbody>
 {% if st.step and st.cause %}<tr><th>멈춘 단계</th><td>{{ st.step }}</td></tr>{% endif %}
 <tr><th>원인</th><td><b>{{ st.cause or st.msg }}</b></td></tr>
 {% if st.files %}<tr><th>확인할 파일</th><td><ul style="margin:0;padding-left:18px">{% for f in st.files %}<li>{{ f }}</li>{% endfor %}</ul></td></tr>{% endif %}
 {% if st.hint %}<tr><th>이렇게 해 보세요</th><td>{{ st.hint }}</td></tr>{% endif %}
 </tbody></table>
-<p class="muted">고친 뒤 <a href="{{ url_for('weeks') }}">주차 목록</a>에서 다시 '통계 집계'을 누르면 됩니다. 이전 게시본은 그대로 남아 있어 회의용 화면에는 영향이 없습니다.</p>
+<p class="muted">고친 뒤 <a href="{{ url_for('weeks') }}">주차 목록</a>에서 다시 '재계산'을 누르면 됩니다. 이전 게시본은 그대로 남아 있어 회의용 화면에는 영향이 없습니다.</p>
 <details><summary>기술 로그 (원인을 모를 때 캡처해서 보내 주세요)</summary><pre class="log">{{ log }}</pre></details></div>{% endif %}
 {% if ck %}<div class="card"><h2>점검 목록</h2>
 {% if ck.info %}<h3>최근 투입계획 우선 적용</h3><ul>{% for w in ck.info %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}

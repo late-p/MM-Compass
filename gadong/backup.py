@@ -1,6 +1,6 @@
 """자동 백업 — 계정 DB · 업로드 원본 · 게시본 · 기본 입력 파일을 zip 하나로
 
-- 언제: 사이트를 켤 때(마지막 백업이 20시간 넘었으면) · 켜져 있는 동안 1시간마다 확인해 하루 1번 · 집계본 게시 직후 · 관리자가 '지금 백업'
+- 언제: 사이트를 켤 때(마지막 백업이 20시간 넘었으면) · 켜져 있는 동안 1시간마다 확인해 하루 1번 · 계산본 게시 직후 · 관리자가 '지금 백업'
 - 어디로: storage/backup_dir.txt 에 적힌 폴더 (관리자 화면에서 바꿈) · 없으면 storage/backups
 - 몇 개: 최근 30개만 남기고 오래된 것부터 지움
 - 다시 만들 수 있는 것(work · drafts · previews)은 넣지 않음
@@ -67,7 +67,7 @@ def make_backup(app, reason="자동"):
             for f in ("secret.key", "backup_dir.txt"):
                 if os.path.exists(os.path.join(st, f)): z.write(os.path.join(st, f), f"storage/{f}")
             z.writestr("복원방법.txt", "1) 사이트(검은 창)를 끕니다.\r\n2) 이 zip 안의 storage 폴더 내용을 가동ON_site\\storage 에 덮어씁니다.\r\n"
-                       "3) 시작.bat 으로 다시 켭니다. (work·drafts는 통계 집계하면 다시 만들어집니다)\r\n")
+                       "3) 시작.bat 으로 다시 켭니다. (work·drafts는 재계산하면 다시 만들어집니다)\r\n")
         os.replace(part, os.path.join(d, name))
         os.remove(tmp_db)
         for old in sorted(glob.glob(os.path.join(d, PREFIX + "*.zip")), reverse=True)[KEEP:]:

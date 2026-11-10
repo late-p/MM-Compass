@@ -1,7 +1,7 @@
 """MM-Compass — 인력 가동 현황 사이트 (뼈대)
 
 역할
-  admin    : 관리자. 전체 대시보드, 업로드 현황, 사용자·주차 관리, 통계 집계
+  admin    : 관리자. 전체 대시보드, 업로드 현황, 사용자·주차 관리, 재계산
   uploader : 업로드 담당자. 담당 부서 투입계획 업로드, 본인 업로드 이력
   viewer   : 회의 참석자. 게시된 회의용 대시보드 보기
 """
@@ -61,7 +61,7 @@ def create_app():
     db.init_app(app)
     db.migrate(app)
     if not cloud and not app.config["REMOTE_FILES"]: db.sync_published(app)
-    # 계산 도중 사이트가 꺼졌거나 PC가 재시작됐다면 '계산 중'이 영원히 남아 통계 집계 버튼이 잠김 → 켤 때 '중단됨'으로 정리
+    # 계산 도중 사이트가 꺼졌거나 PC가 재시작됐다면 '계산 중'이 영원히 남아 재계산 버튼이 잠김 → 켤 때 '중단됨'으로 정리
     try:
         import datetime as _dt
         from engine import run as _er
@@ -71,7 +71,7 @@ def create_app():
             if _s and _s.get("state") == "running":
                 _er._set(storage, _L, state="error", finished=_dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                          msg="계산 도중 사이트가 꺼지거나 다시 켜져서 중단되었습니다.", cause="계산 중단 (사이트 재시작)",
-                         hint="'통계 집계'을 다시 눌러 주세요. 이전 집계본과 게시본은 그대로입니다.", files=[])
+                         hint="'재계산'을 다시 눌러 주세요. 이전 계산본과 게시본은 그대로입니다.", files=[])
     except Exception:
         pass
     auth.init_app(app)
@@ -90,7 +90,7 @@ def create_app():
         file_endpoints = {"upload", "upload_delete", "plan_edit", "my_nochange", "weeks", "targets", "remind"}
         if app.config["REMOTE_FILES"]: file_endpoints = {"remind"}
         if cloud and request.method not in {"GET", "HEAD", "OPTIONS"} and request.endpoint in file_endpoints:
-            return render_template("empty.html", msg="파일 업로드·통계 집계 기능은 준비 중입니다. 로그인과 계정 관리, 인사 변동 제출은 이용할 수 있습니다."), 503
+            return render_template("empty.html", msg="파일 업로드·재계산 기능은 준비 중입니다. 로그인과 계정 관리, 인사 변동 제출은 이용할 수 있습니다."), 503
 
     @app.get("/healthz")
     def health():

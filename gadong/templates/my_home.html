@@ -51,7 +51,7 @@
 </tbody></table></div></div>
 
 <div class="card" id="hr"><h2>인사 변동 알리기 <span class="muted" style="font-size:12px;font-weight:400">달 중간 입사·퇴사·휴직·복직·조직이동</span></h2>
-<div class="tip">가동 대상 인원은 <b>회사 인사자료</b>가 기준입니다. 인사자료에 아직 안 들어간 변동(예: 11/15 입사, 11/20 휴직 시작)을 적어 주시면 관리자가 확인해 반영하면 다음 통계 집계부터 가동대상MM에 들어갑니다. 투입계획 표에는 그대로 숫자로 반영해 주세요.</div>
+<div class="tip">가동 대상 인원은 <b>회사 인사자료</b>가 기준입니다. 인사자료에 아직 안 들어간 변동(예: 11/15 입사, 11/20 휴직 시작)을 적어 주시면 관리자가 확인해 반영하면 다음 재계산부터 가동대상MM에 들어갑니다. 투입계획 표에는 그대로 숫자로 반영해 주세요.</div>
 {% for n in notes if n['id']==hr_ok %}<div class="okbox">제출했습니다 — <b>{{ n['name'] }} · {{ n['kind'] }} · {{ n['date'] }}</b>. 관리자 '제출 현황' 화면에 바로 올라가고, 처리 결과는 아래 내역에 표시됩니다.</div>{% endfor %}
 <form method="post" action="{{ url_for('my_hr') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="dept" value="{{ dept }}">
 <div class="hrf"><div><label>성명</label><input name="name" required maxlength="30"></div><div><label>사번 <span class="muted">(알면)</span></label><input name="sabun" maxlength="20"></div>

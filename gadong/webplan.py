@@ -1,6 +1,6 @@
 """사이트 안에서 투입계획 직접 입력
 - 최근 계산 결과(work/<주차>/use_*.pkl)에서 담당 범위 인원의 가동대상·현재 투입을 불러와 화면에 펼침
-- 저장하면 표준 '인력롤링' 양식 엑셀을 만들어 일반 업로드와 똑같이 등록 → 미리보기 · 제출 · 반영 확정 · 통계 집계 흐름 그대로
+- 저장하면 표준 '인력롤링' 양식 엑셀을 만들어 일반 업로드와 똑같이 등록 → 미리보기 · 제출 · 반영 확정 · 재계산 흐름 그대로
 """
 import os, re, glob, json, datetime as dt, collections
 import pandas as pd, openpyxl
@@ -33,7 +33,7 @@ def load(storage, units, keys=None):
     {label, cur, teams:[{key,label,dv,n}], people:[{gid,corp,name,team,tk,tl,dv,T,tag,lines}], projects}"""
     from . import org as ORG
     label = latest_work(storage)
-    if not label: return None, "아직 통계 집계한 주차가 없습니다. 관리자가 한 번 통계 집계한 뒤 쓸 수 있습니다."
+    if not label: return None, "아직 재계산한 주차가 없습니다. 관리자가 한 번 재계산한 뒤 쓸 수 있습니다."
     if isinstance(units, str): units = [units]
     tk = ORG.expand(storage, units)
     if keys is not None: tk = [k for k in tk if k in set(keys)]
@@ -158,7 +158,7 @@ def template_xlsx(path, storage, units, user, keys=None):
     tkeys = [t["key"] for t in data["teams"]]
     dept = ORG.summary(tkeys)
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = "인력_투입현황MM"
-    ws.append([None, f"■ 2026년 인력별 프로젝트 투입현황 · {dept} · MM-Compass 업로드 템플릿 ({dt.datetime.now():%Y-%m-%d} · 기준 집계본 {data['label']})"])
+    ws.append([None, f"■ 2026년 인력별 프로젝트 투입현황 · {dept} · MM-Compass 업로드 템플릿 ({dt.datetime.now():%Y-%m-%d} · 기준 계산본 {data['label']})"])
     ws.append([None, f"※ 노란 칸({cur}월~12월 MM)만 고치세요. 회색 칸(지난달까지)은 고쳐도 반영되지 않습니다 · 열 순서·머리글·시트 이름은 바꾸지 마세요 · "
                      "새 프로젝트는 그 사람 행 아래에 행을 넣고 성명을 똑같이 쓰면 됩니다 · 여러 팀이 한 시트에 섞여 있어도 올리면 사이트가 팀별로 나눠 등록합니다"])
     ws.append([]); ws.append([None, None, "투입인력", None, None, None, None, "투입여부", None, "프로젝트"]); ws.append(RH)

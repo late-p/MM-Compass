@@ -26,9 +26,9 @@ def start(label, user):
     with db.transaction(current_app) as connection:
         row = connection.execute("INSERT INTO calc_jobs(id,label,by_user,started,user_id) VALUES(?,?,?,?,(SELECT id FROM users WHERE username=?)) ON CONFLICT DO NOTHING RETURNING id",
                                  (identifier, label, user, db.now(), user)).fetchone()
-        if not row: return False, "다른 통계 집계가 진행 중입니다. 계산 화면에서 이어서 진행하거나 취소해 주세요."
+        if not row: return False, "다른 재계산이 진행 중입니다. 계산 화면에서 이어서 진행하거나 취소해 주세요."
         connection.execute("INSERT INTO weeks(label,title) VALUES(?,?) ON CONFLICT(label) DO NOTHING", (label, meta["title"]))
-    return True, "통계 집계를 시작했습니다. 이 화면을 열어 두면 단계별로 이어서 계산합니다."
+    return True, "재계산을 시작했습니다. 이 화면을 열어 두면 단계별로 이어서 계산합니다."
 
 
 def get(label):
@@ -40,7 +40,7 @@ def status(label):
     row = get(label)
     if not row: return {}
     from engine import run
-    names = ["입력 자료 준비"] + [name for name, _ in run.STEPS] + ["집계본 저장"]
+    names = ["입력 자료 준비"] + [name for name, _ in run.STEPS] + ["계산본 저장"]
     detail = json.loads(row["detail"])
     return dict(detail, id=row["id"], state=row["state"], started=row["started"], finished=row["finished"],
                 step=detail.get("step") or (names[min(row["step"], len(names)-1)] if row["state"] == "running" else "완료"),
@@ -51,7 +51,7 @@ def cancel(label):
     # 실행 중인 워커는 최종 CAS에서 거절된다. 새 게시본에 영향을 주지 않는다.
     with db.transaction(current_app) as connection:
         connection.execute("UPDATE calc_jobs SET state='error',lease_token='',finished=?,detail=? WHERE label=? AND state='running'",
-                           (db.now(), json.dumps({"cause": "관리자가 계산을 취소했습니다.", "hint": "통계 집계를 다시 시작할 수 있습니다."}, ensure_ascii=False), label))
+                           (db.now(), json.dumps({"cause": "관리자가 계산을 취소했습니다.", "hint": "재계산을 다시 시작할 수 있습니다."}, ensure_ascii=False), label))
 
 
 def _rebase(value, old, new):
@@ -159,10 +159,10 @@ def publish(label):
     # 미리보기한 완성본의 모든 필수 결과가 있어야 포인터를 한 번에 전환한다.
     with db.transaction(current_app) as connection:
         selected = connection.execute("SELECT draft_job FROM weeks WHERE label=?", (label,)).fetchone()
-    if not selected or not selected["draft_job"]: raise ValueError("게시할 집계본이 없습니다.")
+    if not selected or not selected["draft_job"]: raise ValueError("게시할 계산본이 없습니다.")
     for name in ("admin.html", "meeting.html", "checks.json", "inputs.json", "summary.json"):
-        if not report_path(label, name): raise ValueError("완성된 집계본이 없습니다. 통계 집계를 완료한 뒤 게시해 주세요.")
+        if not report_path(label, name): raise ValueError("완성된 계산본이 없습니다. 재계산을 완료한 뒤 게시해 주세요.")
     with db.transaction(current_app) as connection:
         row = connection.execute("UPDATE weeks SET published_job=draft_job,published=1,published_at=? WHERE label=? AND draft_job=? AND draft_job IN (SELECT id FROM calc_jobs WHERE state='done') RETURNING published_job",
                                  (db.now(), label, selected["draft_job"])).fetchone()
-        if not row: raise ValueError("게시할 집계본을 찾지 못했습니다.")
+        if not row: raise ValueError("게시할 계산본을 찾지 못했습니다.")

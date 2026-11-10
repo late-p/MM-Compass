@@ -1,5 +1,15 @@
 {% extends "base.html" %}{% block title %}MM-Compass · 투입계획 업로드{% endblock %}{% block body %}
-{% set u = me() %}<h1>투입계획 업로드</h1><div class="sub">{{ week }} · 올리면 바로 <b>반영 미리보기</b>가 나옵니다 → 확인 후 <b>제출</b> → 관리자 <b>반영 확정</b> → 재계산 때 반영 · 같은 부서가 다시 올리면 최신 파일이 쓰입니다 · 엑셀(.xlsx/.xlsm/.xls), 최대 20MB · .xlsm은 매크로를 떼고 값만 보관 · <a href="{{ url_for('guide') }}"><b>처음이면 업로드 안내 보기 ›</b></a></div>
+{% set u = me() %}<div class="up-head"><h1>투입계획 업로드</h1><span class="up-week">{{ week }}</span></div>
+<ol class="up-steps" aria-label="반영 순서"><li>파일 업로드</li><li>미리보기 확인</li><li>승인 대기</li><li>재계산 반영</li></ol>
+<style>
+.up-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}.up-head h1{margin:0}
+.up-week{background:#0F2942;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:999px;white-space:nowrap}
+.up-steps{list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:0;margin:0 0 14px;padding:0;font-size:13.5px;color:#475569}
+.up-steps li{white-space:nowrap}.up-steps li+li:before{content:"92";margin:0 10px;color:#94A3B8}
+.up-steps li:last-child{font-weight:700;color:#0F2942}
+.up-notes{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-top:10px;font-size:12.5px;line-height:1.6;color:#64748b}
+.up-notes ul{margin:0;padding-left:16px}.up-notes a{white-space:nowrap;font-weight:700}
+</style>
 <div class="card pv-ok" style="display:flex;align-items:center;gap:12px"><div style="flex:1"><b>엑셀 없이 화면에서 바로 고치기</b><span class="muted"> · 우리 부서 인원·프로젝트가 이미 채워진 표에서 당월~12월 숫자만 고치면 됩니다</span></div><a class="btn primary" href="{{ url_for('plan_edit') }}" style="padding:8px 16px;background:#1F5FD0;color:#fff;text-decoration:none;font-weight:700">투입계획 입력 화면 ›</a></div>
 <div class="card" id="tpl"><div><b>작성 양식(업로드 템플릿) 받기</b><span class="muted"> · 인원 기본정보(성명·사번·직무·직급)와 지금 반영된 투입이 미리 채워진 표준 양식 · <b>팀 단위</b>로 고르면 여러 팀이 <b>한 시트(팀 열)</b>에 담깁니다 · 퇴사·전출·휴직으로 가동대상이 없는 사람은 자동으로 빠집니다 · 당월~12월 노란 칸만 고쳐 올리세요 (회색 칸은 고쳐도 반영되지 않습니다)</span></div>
 <form method="get" action="{{ url_for('plan_template') }}" id="tplf" style="margin:10px 0 0">
@@ -25,8 +35,8 @@ draw()})();</script>
 <div><label>부서</label>{% if u['role']=='admin' %}<select name="dept"><option value="">(해당 없음 · 인사정보·통계·CP)</option><option value="{{ ALL }}">전체 팀 (파일 안의 팀별로 나눠 등록)</option>{% for d in depts %}<option>{{ d }}</option>{% endfor %}</select>
 {% elif mydepts|length > 1 %}<select name="dept">{% if nass > 1 %}<option value="{{ ALL }}">내 담당 전체 (파일 안의 팀별로 나눠 등록)</option>{% endif %}{% for d in mydepts %}<option {{ 'selected' if d == cur }}>{{ d }}</option>{% endfor %}</select>
 {% else %}<input value="{{ cur }}" disabled><input type="hidden" name="dept" value="{{ cur }}">{% endif %}</div></div>
-<p class="muted" style="margin:10px 0 0">팀별 분리는 자동입니다: 인력롤링 양식을 본부·사업부 단위로 올리면 팀별로 나뉘어 등록되고(팀마다 미리보기·제출이 따로 생깁니다), AX 가득가동현황·DX·MSP 같은 독자 양식과 하반기 총괄은 파일 그대로 한 건으로 등록됩니다.</p>
-<p class="muted" style="margin:8px 0 0">투입계획: 부서를 고르지 않으면 파일 이름·양식으로 부서를 자동 인식 · 하반기 총괄은 「전체 (하반기 총괄)」 · SOLD·가동인력목록은 법인 선택 · 잘못 올린 파일은 '삭제'</p><label>파일</label><div class="drop"><input type="file" name="file" accept=".xlsx,.xlsm,.xls" required></div>
+<label>파일</label><div class="drop"><input type="file" name="file" accept=".xlsx,.xlsm,.xls" required></div>
+<div class="up-notes"><div><div>지원 파일: Excel (.xlsx, .xlsm, .xls) / 최대 20MB</div><ul><li>동일 부서 파일을 올리면 최신 파일로 자동 대체(덮어쓰기)됩니다.</li><li>매크로 포함 파일(.xlsm)은 데이터 값만 보관되어 처리됩니다.</li><li>부서를 고르지 않으면 파일 이름·양식으로 자동 인식하고, 본부·사업부 단위 파일은 팀별로 나뉘어 등록됩니다.</li></ul></div><a href="{{ url_for('guide') }}">업로드 가이드 보기 ›</a></div>
 <div style="margin-top:12px"><button class="primary" id="upbtn">업로드</button> <span class="muted" id="upmsg">파일 전송·양식 확인 후 미리보기 화면으로 이동합니다.</span></div></form>
 <script>document.getElementById('upbtn').closest('form').addEventListener('submit',function(){var b=document.getElementById('upbtn');b.disabled=true;b.textContent='올리는 중…';document.getElementById('upmsg').textContent='파일을 올리는 중입니다. 잠시만 기다려 주세요.'});</script></div>
 <div class="card"><h2>{{ '전체 업로드 내역' if u['role']=='admin' else '내 업로드 내역' }}</h2>

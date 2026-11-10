@@ -5,7 +5,7 @@
 <div class="card"><div style="overflow-x:auto"><table><thead><tr><th>팀</th><th>읽은 인원</th><th>상태</th><th>확인할 것</th><th></th></tr></thead><tbody>
 {% for r in rows %}{% set pv = pvs.get(r['id']) %}<tr><td><b>{{ org.label(r['dept']) }}</b> <span class="muted">{{ r['orig_name'].split('[')[0][:30] }}</span></td>
 <td>{% if pv and pv.read %}{{ pv.read|map(attribute='n')|sum }}명{% else %}<span class="muted">미리보기 준비 중…</span>{% endif %}</td>
-<td><span class="st st-{{ css.get(r['status'], 'sub') }}" title="{{ help.get(r['status'], '') }}">{{ r['status'] }}</span></td>
+<td><span class="st st-{{ css.get(r['status'], 'sub') }}" title="{{ help.get(r['status'], '') }}">{{ '승인 대기' if r['status']=='확인 대기' else r['status'] }}</span></td>
 <td>{% if pv %}{% set rd = pv.get('red') or [] %}{% if rd %}<span style="color:#B42335">꼭 확인 {{ rd|length }}건</span>{% else %}<span class="muted">이상 없음</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
 <td><a href="{{ url_for('upload_preview', uid=r['id'], make=1) }}">미리보기 ›</a></td></tr>{% endfor %}
 </tbody></table></div>

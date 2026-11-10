@@ -49,7 +49,7 @@
 .pe-bar{position:sticky;bottom:0;background:#0F2942;color:#fff;display:flex;gap:14px;align-items:center;padding:12px 18px;margin-top:14px;z-index:5}
 .pe-bar .grow{flex:1}.pe-bar b{color:#FFD27A}.pe-bar button{background:#1F5FD0;color:#fff;border:0;padding:9px 18px;font:inherit;font-weight:700;cursor:pointer}
 .pe-bar button.ghost{background:transparent;border:1px solid rgba(255,255,255,.5)}.pe-bar button:disabled{opacity:.5;cursor:default}
-.pe-bar .sv{font-size:12px;opacity:.75}
+.pe-bar .sv{font-size:12px;opacity:.75;white-space:nowrap}.pe-bar button{white-space:nowrap}
 .draft{display:flex;gap:10px;align-items:center;background:#FFF6DD;border:1px solid #F0D58A;padding:10px 14px;margin-bottom:12px}
 .pe tr.hide{display:none}
 .pe tr.tm td{background:#E6EEF8;border-top:3px solid #1F3B63;color:#0F2942;font-weight:800;font-size:14.5px;padding:8px 10px}.pe tr.tm td small{font-weight:500;color:#4B5E78;margin-left:10px;font-size:12.5px}
@@ -77,13 +77,13 @@
 <div class="card">
 <div class="pe-tools"><b>{{ '내 담당 전체' if dept == ALL else dept }}</b><a href="{{ url_for('plan_template', dept=dept) }}" style="font-size:12.5px">⬇ 엑셀 템플릿{% if data.teams|length > 1 %} (한 시트 · 팀 열){% endif %}</a><span class="muted">· {{ data.teams|length }}팀 · {{ data.people|length }}명 · 기준 계산본 {{ data.label }}</span>
 {% if data.teams|length > 1 %}<select id="tf" style="width:auto;max-width:300px" title="팀 보기"><option value="">모든 팀 한 화면에</option>{% for t in data.teams %}<option value="{{ t.key }}">{{ t.label }} ({{ t.n }}명)</option>{% endfor %}</select>{% endif %}
-<input type="search" id="q" placeholder="이름·팀·프로젝트 찾기"><label class="muted"><input type="checkbox" id="onlyIdle"> 대기 있는 사람만</label><label class="muted"><input type="checkbox" id="onlyChg"> 고친 사람만</label>
+<input type="search" id="q" placeholder="이름·팀·프로젝트 찾기"><label class="muted"><input type="checkbox" id="onlyIdle"> 대기 있는 사람만</label><label class="muted"><input type="checkbox" id="onlyChg"> 변경한 사람만</label>
 <span class="pe-legend"><i style="background:#E9F5EF"></i>대기 없음 (다 투입)<i style="background:#FFF6DD"></i>대기 있음<i style="background:#FBE4E6"></i>초과 투입 (빨간 칸)</span></div>
 <div class="scroll"><table class="pe" id="pe"><colgroup><col class="c-name"><col class="c-pj"><col class="c-kind"><col class="c-m" span="{{ 12 - data.cur + 2 }}"><col class="c-x"></colgroup>
 <thead><tr><th class="l">성명</th><th class="l">프로젝트 <small style="font-weight:500;color:var(--muted)">(사람 줄 = 월별 투입 합계와 가동대상 대비 상태)</small></th><th>구분</th><th>{{ data.cur - 1 }}월<br><small>실적</small></th>{% for m in range(data.cur, 13) %}<th>{{ m }}월{% if m == data.cur %}<br><small>당월</small>{% endif %}</th>{% endfor %}<th></th></tr></thead>
 <tbody id="tb"></tbody></table></div>
 </div>
-<div class="pe-bar"><span class="grow" id="sum"><span>고친 사람 <b>0</b>명</span></span><span class="sv" id="sv"></span><button class="ghost" id="reset">되돌리기</button>{% if data.teams|length > 1 %}<label style="font-size:12.5px;display:inline-flex;align-items:center;gap:4px;margin-right:8px" title="체크하지 않으면 고친 팀만 저장·제출됩니다"><input type="checkbox" id="rest"> 안 고친 팀도 지금 값 그대로 함께 저장</label>{% endif %}<button id="save">저장하고 미리보기</button></div>
+<div class="pe-bar"><span class="grow" id="sum"><span>변경 인원 <b>0</b>명</span></span><span class="sv" id="sv"></span><button class="ghost" id="reset">변경 취소</button>{% if data.teams|length > 1 %}<label style="font-size:12.5px;display:inline-flex;align-items:center;gap:6px;margin-right:8px;white-space:nowrap" title="체크하지 않으면 고친 팀만 저장·제출됩니다"><input type="checkbox" id="rest"> 미수정 팀 현재 값 유지하여 일괄 저장</label>{% endif %}<button id="save">저장 및 미리보기</button></div>
 <script>
 const DATA={{ data|tojson }}, CUR=DATA.cur, MS=[...Array(13-CUR).keys()].map(i=>CUR+i), DEPT={{ dept|tojson }}, CSRF={{ csrf_token()|tojson }};
 const PJ=Object.fromEntries(DATA.projects.map(p=>[p.pj,p]));
@@ -117,10 +117,10 @@ function marks(){P.forEach((p,pi)=>MS.forEach(m=>{const bad=sumM(p,m-1)>p.T[m-1]
   document.querySelectorAll(`input.mm[data-p="${pi}"][data-m="${m-1}"]`).forEach(x=>x.classList.toggle('bad',bad&&+x.value>0))}))}
 let svT=null;
 function upd(){const ch=P.map((p,i)=>chg(i)?i:-1).filter(i=>i>=0),n=ch.length;
-  document.getElementById('sum').innerHTML=`<span>고친 사람 <b>${n}</b>명${n?' :':''}</span>`+ch.slice(0,60).map(i=>`<a data-jump="${i}" title="${esc(P[i].tl)} · 누르면 그 사람 줄로 이동">${esc(P[i].name)}${DATA.teams.length>1?`<small>${esc(P[i].team)}</small>`:''}</a>`).join('')+(n>60?`<span>… 외 ${n-60}명</span>`:'');
+  document.getElementById('sum').innerHTML=`<span>변경 인원 <b>${n}</b>명${n?' :':''}</span>`+ch.slice(0,60).map(i=>`<a data-jump="${i}" title="${esc(P[i].tl)} · 누르면 그 사람 줄로 이동">${esc(P[i].name)}${DATA.teams.length>1?`<small>${esc(P[i].team)}</small>`:''}</a>`).join('')+(n>60?`<span>… 외 ${n-60}명</span>`:'');
   document.getElementById('save').disabled=!n;teamCounts();
-  clearTimeout(svT);svT=setTimeout(()=>{try{if(n){localStorage.setItem(DK,JSON.stringify({at:new Date().toLocaleString('ko-KR'),P}));document.getElementById('sv').textContent='임시저장됨 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}else{localStorage.removeItem(DK);document.getElementById('sv').textContent=''}}catch(e){}},400)}
-function teamCounts(){if(DATA.teams.length<2)return;const c={};P.forEach((p,i)=>{if(chg(i))c[p.tk]=(c[p.tk]||0)+1});document.querySelectorAll('[data-tc]').forEach(e=>{const k=c[e.dataset.tc];e.textContent=k?`고친 사람 ${k}명`:''})}
+  clearTimeout(svT);svT=setTimeout(()=>{try{if(n){localStorage.setItem(DK,JSON.stringify({at:new Date().toLocaleString('ko-KR'),P}));document.getElementById('sv').textContent='임시 저장 완료 ('+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})+')'}else{localStorage.removeItem(DK);document.getElementById('sv').textContent=''}}catch(e){}},400)}
+function teamCounts(){if(DATA.teams.length<2)return;const c={};P.forEach((p,i)=>{if(chg(i))c[p.tk]=(c[p.tk]||0)+1});document.querySelectorAll('[data-tc]').forEach(e=>{const k=c[e.dataset.tc];e.textContent=k?`변경 ${k}명`:''})}
 function jumpTo(pi){const tf=document.getElementById('tf');if(tf&&tf.value&&tf.value!==P[pi].tk)tf.value='';['q'].forEach(id=>document.getElementById(id).value='');document.getElementById('onlyIdle').checked=false;document.getElementById('onlyChg').checked=false;filt();
   const tr=document.querySelector(`tr.ph[data-p="${pi}"]`);if(!tr)return;tr.scrollIntoView({block:'center',behavior:'smooth'});tr.classList.remove('flash');void tr.offsetWidth;tr.classList.add('flash')}
 document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('[data-jump]');if(a){e.preventDefault();jumpTo(+a.dataset.jump)}});
@@ -250,11 +250,11 @@ function filt(){const q=document.getElementById('q').value.trim(),oi=document.ge
     const show=(!q||txt.includes(q))&&(!oi||idle)&&(!oc||chg(pi))&&(!tf||p.tk===tf);if(show)vis[p.tk]=1;document.querySelectorAll(`#tb tr[data-p="${pi}"]`).forEach(r=>r.classList.toggle('hide',!show))});
   document.querySelectorAll('#tb tr.tm').forEach(r=>r.classList.toggle('hide',!vis[r.dataset.tkrow]))}
 ['q','onlyIdle','onlyChg','tf'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',filt)});
-document.getElementById('reset').addEventListener('click',()=>{if(confirm('고친 내용을 모두 되돌릴까요? (임시저장도 지워집니다)')){P=JSON.parse(ORIG);render()}});
+document.getElementById('reset').addEventListener('click',()=>{if(confirm('변경한 내용을 모두 취소할까요? (임시 저장 내용도 삭제됩니다)')){P=JSON.parse(ORIG);render()}});
 document.getElementById('save').addEventListener('click',async()=>{const b=document.getElementById('save');b.disabled=true;b.textContent='저장하는 중…';
-  const over=P.some(p=>MS.some(m=>sumM(p,m-1)>p.T[m-1]+0.005));if(over&&!confirm('가동대상을 넘는 달(빨간 칸)이 있습니다. 그대로 저장할까요? (반영할 때 가동대상만큼만 들어갑니다)')){b.disabled=false;b.textContent='저장하고 미리보기';return}
+  const over=P.some(p=>MS.some(m=>sumM(p,m-1)>p.T[m-1]+0.005));if(over&&!confirm('가동대상을 넘는 달(빨간 칸)이 있습니다. 그대로 저장할까요? (반영할 때 가동대상만큼만 들어갑니다)')){b.disabled=false;b.textContent='저장 및 미리보기';return}
   const r=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF':CSRF},body:JSON.stringify({dept:DEPT,keys:DATA.teams.map(t=>t.key),rest:!!(document.getElementById('rest')&&document.getElementById('rest').checked),people:P})});
-  const j=await r.json().catch(()=>({ok:false,msg:'저장하지 못했습니다.'}));if(j.ok){try{localStorage.removeItem(DK)}catch(e){}location.href=j.url}else{alert(j.msg||'저장하지 못했습니다.');b.disabled=false;b.textContent='저장하고 미리보기'}});
+  const j=await r.json().catch(()=>({ok:false,msg:'저장하지 못했습니다.'}));if(j.ok){try{localStorage.removeItem(DK)}catch(e){}location.href=j.url}else{alert(j.msg||'저장하지 못했습니다.');b.disabled=false;b.textContent='저장 및 미리보기'}});
 window.addEventListener('beforeunload',e=>{if(P.some((p,i)=>chg(i))&&!document.getElementById('save').textContent.includes('중')){e.preventDefault();e.returnValue=''}});
 // ---- 임시저장 불러오기 ----
 (function(){let d=null;try{d=JSON.parse(localStorage.getItem(DK)||'null')}catch(e){}

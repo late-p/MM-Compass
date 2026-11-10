@@ -81,7 +81,11 @@ _pmg = ('<div class="pmg">' + GA.sized(GA.pair(min(_pmv(D, "u"), 100), min(_pmv(
 _pmcls = " pm" if PM_GAUGE else ""
 year_html = (f'<div class="yr{_pmcls}">{_pmg}<div class="yl"><span>{ML_T} · 전사</span><br><span class="y3i">가득률 <b>{_pmv(D, "g"):.2f}%</b> {_pmd(D, "g")}</span> <span class="y3i">비매출 모수 제외 <b>{_pmv(D, "gn"):.2f}%</b></span> <span class="y3i">가동률 <b>{_pmv(D, "u"):.2f}%</b> {_pmd(D, "u")}</span></div>'
              f'<div class="yrr"><span>{ML_T} · 법인별</span>' + "".join(_pmc(c) for c in RT["corps"]) + '</div></div>')
-def _y3(label, items): return f'<div class="y3g"><span class="y3t">{label}</span>' + "".join(f'<span class="y3i">{k} <b>{v:.2f}%</b></span>' for k, v in items) + '</div>'
+def _y3(label, items):
+    def one(k, v):
+        c = "vg" if "가득" in k else "vu"
+        return f'<span class="y3i">{k} <b class="{c}">{v:.2f}%</b></span>'
+    return f'<div class="y3g"><span class="y3t">{label}</span>' + "".join(one(k, v) for k, v in items) + '</div>'
 year3_html = ('<div class="yr3">' + _y3("연간(실적+예상)", [("가득률", D["yg"]), ("가동률", D["yu"]), ("비매출 모수 제외 가득률", D["yn"])])
               + _y3(f"{X.RA} 실적", [("가득률", D["cg"]), ("가동률", D["cu"])]) + '</div>')
 # 본부 목록 (요약·막대·표에서 같이 씀)
@@ -125,11 +129,11 @@ def _tgt(g):
 def _gst(key, d, nr=False):
     _gn = val(d, "gn", P10) if nr else None
     if _gn is not None:
-        return (f'<div class="gst"><div class="gs go two"><div class="gsi"><span>가득률</span><b>{d["g"][P10]:.2f}%</b>{cmp(key, d, "g")}</div>'
-                f'<div class="gsi"><span>가득률 (비매출 모수 제외)</span><b>{_gn:.2f}%</b>{cmp(key, d, "gn")}</div></div>'
-                f'<div class="gs gb"><span>가동률</span><b>{d["u"][P10]:.2f}%</b>{cmp(key, d, "u")}</div></div>')
-    return (f'<div class="gst"><div class="gs go"><span>가득률</span><b>{d["g"][P10]:.2f}%</b>{cmp(key, d, "g")}</div>'
-            f'<div class="gs gb"><span>가동률</span><b>{d["u"][P10]:.2f}%</b>{cmp(key, d, "u")}</div></div>')
+        return (f'<div class="gst"><div class="gs go two"><div class="gsi"><span>가득률</span><b>{d["g"][P10]:.2f}%</b>{cmp(key, d, "g", pre="%")}</div>'
+                f'<div class="gsi"><span>가득률 (비매출 모수 제외)</span><b>{_gn:.2f}%</b>{cmp(key, d, "gn", pre="%")}</div></div>'
+                f'<div class="gs gb"><span>가동률</span><b>{d["u"][P10]:.2f}%</b>{cmp(key, d, "u", pre="%")}</div></div>')
+    return (f'<div class="gst"><div class="gs go"><span>가득률</span><b>{d["g"][P10]:.2f}%</b>{cmp(key, d, "g", pre="%")}</div>'
+            f'<div class="gs gb"><span>가동률</span><b>{d["u"][P10]:.2f}%</b>{cmp(key, d, "u", pre="%")}</div></div>')
 corp_cards = ""; rank_html = ""
 for ci, c in enumerate(RT["corps"]):
     d = c["d"]; ck = K("c", c["name"])
@@ -712,14 +716,30 @@ CSS += r"""
 /* 1110 디자인: 지표 묶음은 항목 단위로만 줄바꿈 */
 .y3i{white-space:nowrap;display:inline-block;margin-right:12px}.y3i:last-child{margin-right:0}
 .yr3{display:grid;grid-template-columns:1fr;gap:8px}
-.yr3 .y3g{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}.yr3 .y3t{font-weight:700;color:var(--navy);margin-right:2px;white-space:nowrap}.yr3 .y3i{margin-right:0;background:#F3F6FB;padding:3px 10px}
+.yr3 .y3g{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}.yr3 .y3t{font-weight:700;color:var(--navy);margin-right:2px;white-space:nowrap}
+.yr3 .y3i{margin-right:0;display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;border-radius:6px;padding:4px 10px;color:#64748B;font-size:14px}
+.yr3 .y3i b{font-weight:700;font-size:15px}.yr3 .y3i b.vg{color:#C26D1A}.yr3 .y3i b.vu{color:#1D4ED8}
 .nw{white-space:nowrap}
-/* 본부 선택: 법인 줄·사업부별 줄의 시작 위치(라벨 칸)를 같게 */
-#gcards{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+/* 본부 선택: 법인 줄·사업부별 줄의 시작 위치(라벨 칸)·높이·간격을 같게 */
+#gcards{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:6px 0 8px}
 #gcards .hqbk{margin:0 0 2px 0}
-#gcards .cgrp,#gsub{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;box-sizing:border-box}
-#gcards .cgl,#gsub .cgl{flex:0 0 112px;width:112px;margin:0;font-size:13px;font-weight:700;color:#4A5A70}
-#gsub{padding-left:0;margin:0 0 12px}
+#gcards .cgrp,#gsub{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;box-sizing:border-box;min-height:0}
+#gcards .cgl,#gsub .cgl{flex:0 0 112px;width:112px;margin:0;padding:0;line-height:1.2;align-self:center;font-size:13px;font-weight:700;color:#4A5A70}
+#gsub{padding:0;margin:0 0 12px}
+#gsub .hqc{margin:0}
+/* 법인별 요약 카드: 지표 3등분 · 전월 확정 줄 */
+.cc2 .gst{grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
+.cc2 .gs.go.two{display:contents}
+.cc2 .gst .gsi{border-top:3px solid #C77B2B;padding:6px 14px;min-width:0}
+.cc2 .gst .gs.gb{padding:6px 14px;border-top-width:3px}
+.cc2 .gst .gsi>span,.cc2 .gst .gs>span{font-size:15px;font-weight:700;color:#4B5563;white-space:nowrap}
+.cc2 .gst .gsi>b,.cc2 .gst .gs>b{display:block;font-size:26px;line-height:1.15;margin:2px 0 6px}
+.cc2 .gst .gsi>b{color:#B8691A}
+.gst .cmp{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-weight:600;color:#374151}
+.cc2 .gst .cmp{font-size:14px}
+.cc2 ol.rkl li,.cc2 .rkh{grid-template-columns:repeat(3,minmax(0,1fr));column-gap:16px}
+.cc2 .rkl li .rn{padding-left:14px}.cc2 .rkt{padding-left:14px}
+.cc2 .pr,.cc2 .rkh .hc{padding-left:14px}
 """
 CSS = CSS.replace("{IT_W}", IT_W).replace("{LV_W}", LV_W)
 import re as _re_fit

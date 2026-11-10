@@ -214,3 +214,8 @@
 .users-status-select{width:auto;min-width:96px;height:34px;padding:0 8px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
 .users-status-select.is-active{color:#14532D;border-color:#9BD3B5;background:#F0F9F4}
 .users-status-select.is-inactive{color:#7F1D1D;border-color:#E8B4B4;background:#FDF3F3}
+
+/* 사용자 등록 카드: 큰 화면에서 입력창이 과하게 퍼지지 않게 */
+.users-create-card { max-width: 1000px; border: 1px solid var(--line); border-radius: 10px; }
+.users-create-card h2 { margin-top: 0; }
+.users-help { margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.4; }

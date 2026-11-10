@@ -1277,7 +1277,7 @@ ORG_JS = ORG_JS + r"""
 // ---- 1110: 비매출 모수 명단 표가 칸 폭 계산 뒤에 오른쪽이 비면 컨테이너 폭까지 비례해서 채움 ----
 (function(){
   function stretch(){
-    document.querySelectorAll('table.np-tab').forEach(function(t){
+    document.querySelectorAll('table.np-tab,#a4 table.mtab').forEach(function(t){
       if(!t.offsetParent) return;
       var sc=t.parentNode, cs=getComputedStyle(sc), inner=sc.clientWidth-parseFloat(cs.paddingLeft||0)-parseFloat(cs.paddingRight||0);
       var cg=t.querySelector(':scope>colgroup'); if(!cg||inner<=0) return;

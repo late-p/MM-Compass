@@ -43,19 +43,19 @@
 </section>
 {% endif %}
 
-<section class="card">
-  <h2>계정 만들기</h2>
+<section class="card users-create-card">
+  <h2>사용자 등록</h2>
   <form method="post" class="users-create-form">
     {{ form_fields('create') }}
     <div class="users-form-grid">
       <div class="users-field"><label for="new-username">아이디</label><input id="new-username" name="username" required autocomplete="off"></div>
-      <div class="users-field"><label for="new-display">표시 이름</label><input id="new-display" name="display"></div>
-      <div class="users-field"><label for="new-role">역할</label><select id="new-role" name="role">{% for k,v in roles.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
-      <div class="users-field"><label for="new-dept">담당 부서 <span class="muted">(업로드 담당자만)</span></label><select id="new-dept" name="dept"><option value="">—</option>{% for d in depts %}<option>{{ d }}</option>{% endfor %}</select></div>
-      <div class="users-field"><label for="new-password">초기 비밀번호 <span class="muted">(8자 이상)</span></label><input id="new-password" name="password" type="password" required minlength="8" autocomplete="new-password"></div>
-      <div class="users-field"><label for="new-email">메일 주소</label><input id="new-email" name="email" type="email" placeholder="회사 메일 주소"></div>
+      <div class="users-field"><label for="new-display">이름</label><input id="new-display" name="display" placeholder="이름 입력"></div>
+      <div class="users-field"><label for="new-role">권한</label><select id="new-role" name="role">{% for k,v in roles.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+      <div class="users-field"><label for="new-dept">담당 부서</label><select id="new-dept" name="dept"><option value="">—</option>{% for d in depts %}<option>{{ d }}</option>{% endfor %}</select><div class="users-help">업로드 담당자 권한인 경우에만 선택</div></div>
+      <div class="users-field"><label for="new-password">초기 비밀번호</label><input id="new-password" name="password" type="password" placeholder="영문, 숫자 포함 8자 이상" required minlength="8" autocomplete="new-password"></div>
+      <div class="users-field"><label for="new-email">이메일</label><input id="new-email" name="email" type="email" placeholder="사내 이메일 주소 입력"></div>
     </div>
-    <div class="users-form-footer"><button class="primary">만들기</button></div>
+    <div class="users-form-footer"><button class="primary">등록</button></div>
   </form>
 </section>
 

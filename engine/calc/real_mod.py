@@ -1265,6 +1265,12 @@ ORG_CSS = ORG_CSS + """
   .nw{white-space:nowrap}
   .od-idle table td .leave-tag,.od-idle table td .exec-tag,.leave-tag,.exec-tag{white-space:nowrap!important;word-break:keep-all}
   #idle td .leave-tag,#idle td .exec-tag{white-space:nowrap!important}
+  /* 비매출 모수 명단: 표를 박스 좌우 끝까지 채우고, 배너·탭·표 글자의 시작 축(14px)을 같게 */
+  .np-list .scroll{padding:0 0 6px!important}
+  .np-list table.np-tab{width:100%;table-layout:fixed}
+  .np-tab th:first-child,.np-tab td:first-child,table.ca-fix.np-tab td:first-child{padding-left:14px!important}
+  .np-tab th:last-child,.np-tab td:last-child{padding-right:14px!important}
+  .np-tab tr.np-grp td:first-child{padding-left:14px!important}
 """
 
 ORG_JS = ORG_JS + r"""

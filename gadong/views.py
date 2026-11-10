@@ -6,7 +6,7 @@ from .auth import login_required, check_csrf, hash_pw
 from .scope import user_depts, pick_dept, allowed, units_of, ALL, upload_options
 from . import org as ORG
 
-ROLES = {"admin": "관리자", "uploader": "업로드 담당자", "viewer": "회의 참석자"}
+ROLES = {"admin": "관리자", "uploader": "업로드 담당자", "viewer": "회의 참가자"}
 KINDS_UPLOADER = {"plan": "투입계획 (인력롤링·부서 양식)"}
 KINDS_ADMIN = {"plan": "투입계획 (인력롤링·부서 양식)", "sold": "SOLD투입MM목록 (법인 선택)", "target": "가동인력목록 (법인 선택)",
                "hr": "통합인사정보조회", "stats": "가동가득 통계 (최종 기준)", "cp": "프로젝트 코드 목록 (CP)"}

@@ -3,7 +3,7 @@
 역할
   admin    : 관리자. 전체 대시보드, 업로드 현황, 사용자·주차 관리, 재계산
   uploader : 업로드 담당자. 담당 부서 투입계획 업로드, 본인 업로드 이력
-  viewer   : 회의 참석자. 게시된 회의용 대시보드 보기
+  viewer   : 회의 참가자. 게시된 회의용 대시보드 보기
 """
 import os, secrets, tempfile
 from pathlib import Path

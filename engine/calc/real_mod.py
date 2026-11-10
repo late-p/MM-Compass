@@ -479,8 +479,10 @@ def job_select(el_id, persons, style="width:170px"):
     for p in persons:
         c = job_canon(p.get("직무"))
         if c: seen.setdefault(job_key(p.get("직무")), c)
-    opts = "".join(f'<option value="{k}">{_h.escape(v)}</option>' for k, v in sorted(seen.items(), key=lambda kv: kv[1].lower()))
-    return f'<select id="{el_id}" style="{style}"><option value="">전체 직무</option>{opts}</select>'
+    opts = "".join(f'<option value="{_h.escape(v)}"></option>' for k, v in sorted(seen.items(), key=lambda kv: kv[1].lower()))
+    return (f'<input id="{el_id}" type="search" list="{el_id}L" placeholder="직무 검색 · 선택" autocomplete="off" style="{style}" title="입력해서 검색하거나 화살표로 목록에서 고르세요 · 지우면 전체">'
+            f'<datalist id="{el_id}L"><option value="전체 직무"></option>{opts}</datalist>')
+
 
 def _org_cell(h, esc=lambda x: x):
     """인사 변동 소속 칸: 전배처럼 '이전 → 이후'가 길면 화살표까지만 윗줄, 이후 소속은 아랫줄 전체"""
@@ -1184,6 +1186,7 @@ ORG_JS = ORG_JS + r"""
 // ---- 대기 인력: 사업부장 제외 · 누적 대기 기간 필터 (합계 재계산) ----
 (function(){
   const box=document.getElementById('idle'); if(!box) return;
+  const JOBQ=v=>{v=(v||'').replace(/\s+/g,'').toLowerCase();return v==='전체직무'?'':v};
   const ex=document.getElementById('exShow'), ld=document.getElementById('ldSel'), jq=document.getElementById('jobQ');
   const ids=['sc-conf','sc-all','sc-cl','sc-et','sc-need'], cls=['gm-n','gm-h1','gm-hp','gm-hc','gm-need'];
   const orig=new Map();
@@ -1191,9 +1194,9 @@ ORG_JS = ORG_JS + r"""
   box.querySelectorAll('details.grp .gv').forEach(e=>orig.set(e,e.innerHTML));
   const f2=v=>v.toFixed(2);
   function apply(){
-    const hideEx=ex&&!ex.checked, minM=ld?+ld.value:0, q=jq?jq.value:'', active=hideEx||minM>0||!!q;
+    const hideEx=ex&&!ex.checked, minM=ld?+ld.value:0, q=jq?JOBQ(jq.value):'', active=hideEx||minM>0||!!q;
     const rows=[...box.querySelectorAll('tr[data-name]')];
-    rows.forEach(r=>r.classList.toggle('flt',!!((hideEx&&r.dataset.exec)||(minM&&(+r.dataset.mon<minM))||(q&&(r.dataset.job||'')!==q))));
+    rows.forEach(r=>r.classList.toggle('flt',!!((hideEx&&r.dataset.exec)||(minM&&(+r.dataset.mon<minM))||(q&&(r.dataset.job||'').indexOf(q)<0))));
     if(q) box.querySelectorAll('details.grp').forEach(d=>{if([...d.querySelectorAll('tr[data-name]')].some(r=>!r.classList.contains('flt'))) d.open=true});
     if(!active){orig.forEach((h,e)=>e.innerHTML=h); return}
     const A={conf:[0,0],all:[0,0],cl:[0,0],et:[0,0],need:[0,0]};
@@ -1215,7 +1218,7 @@ ORG_JS = ORG_JS + r"""
     if(typeof idleFilter==='function') idleFilter();
   }
   [ex,ld].forEach(e=>e&&e.addEventListener('change',()=>{apply(); if(typeof idleFilter==='function') idleFilter()}));
-  if(jq) jq.addEventListener('input',()=>{apply(); if(typeof idleFilter==='function') idleFilter()});
+  if(jq) ['input','change'].forEach(ev=>jq.addEventListener(ev,()=>{apply(); if(typeof idleFilter==='function') idleFilter()}));
 }).call(this);
 """.replace("__CM__", str(CM))
 ORG_CSS = ORG_CSS + r"""
@@ -1271,6 +1274,7 @@ ORG_CSS = ORG_CSS + """
   .np-tab th:first-child,.np-tab td:first-child,table.ca-fix.np-tab td:first-child{padding-left:14px!important}
   .np-tab th:last-child,.np-tab td:last-child{padding-right:14px!important}
   .np-tab tr.np-grp td:first-child{padding-left:14px!important}
+  #a4 table.mtab td:first-child,#a4 table.mtab th:first-child{white-space:nowrap}
 """
 
 ORG_JS = ORG_JS + r"""
@@ -1283,7 +1287,12 @@ ORG_JS = ORG_JS + r"""
       var cg=t.querySelector(':scope>colgroup'); if(!cg||inner<=0) return;
       var cols=[].slice.call(cg.children); var tot=0; cols.forEach(function(c){tot+=parseFloat(c.style.width)||0});
       if(!tot||inner-tot<4||t.dataset.npw==String(Math.round(inner))&&Math.abs(t.offsetWidth-inner)<3) return;
-      var k=inner/tot; cols.forEach(function(c){c.style.width=(parseFloat(c.style.width)*k).toFixed(1)+'px'});
+      var k=inner/tot, first=-1;
+      if(t.closest('#a4')){ // 04 본부별 가득률: 첫 칸(법인/본부)은 좁게 고정, 남는 폭은 월·연간 칸에 나눔
+        var w0=Math.min(parseFloat(cols[0].style.width)||0,170); first=0;
+        k=(inner-w0)/(tot-(parseFloat(cols[0].style.width)||0)); cols[0].style.width=w0.toFixed(1)+'px';
+      }
+      cols.forEach(function(c,i){if(i===first)return;c.style.width=(parseFloat(c.style.width)*k).toFixed(1)+'px'});
       t.style.width=inner+'px'; t.style.minWidth=inner+'px'; t.dataset.npw=String(Math.round(inner));
     });
   }

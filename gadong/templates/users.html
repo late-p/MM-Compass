@@ -15,11 +15,11 @@
 <section class="card pend">
   <div class="users-section-heading">
     <h2>가입 신청 <b>{{ pend|length }}건</b></h2>
-    <p class="muted">역할·담당 부서를 확인하고 승인하세요</p>
+    <p class="muted">권한·담당 부서를 확인하고 승인하세요</p>
   </div>
   <div class="users-table-scroll" tabindex="0" role="region" aria-label="가입 신청 목록">
     <table class="users-table users-pending-table">
-      <thead><tr><th scope="col">신청일</th><th scope="col">아이디</th><th scope="col">이름</th><th scope="col">이메일</th><th scope="col">요청 사항</th><th scope="col">역할</th><th scope="col">담당 부서</th><th scope="col">처리</th></tr></thead>
+      <thead><tr><th scope="col">신청일</th><th scope="col">아이디</th><th scope="col">이름</th><th scope="col">이메일</th><th scope="col">요청 사항</th><th scope="col">권한</th><th scope="col">담당 부서</th><th scope="col">처리</th></tr></thead>
       <tbody>
       {% for r in pend %}
         <tr>
@@ -28,7 +28,7 @@
           <td data-label="이름">{{ r['display'] }}</td>
           <td data-label="이메일" class="users-cell-wide">{{ r['email'] or '—' }}</td>
           <td data-label="요청 사항" class="muted users-cell-wide">{{ r['req_note'] or '—' }}</td>
-          <td data-label="역할" class="users-cell-wide"><select name="role" form="pf{{ r['id'] }}" aria-label="{{ r['username'] }} 승인 역할">{% for k,v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == r['role'] }}>{{ v }}</option>{% endfor %}</select></td>
+          <td data-label="권한" class="users-cell-wide"><select name="role" form="pf{{ r['id'] }}" aria-label="{{ r['username'] }} 승인 권한">{% for k,v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == r['role'] }}>{{ v }}</option>{% endfor %}</select></td>
           <td data-label="담당 부서" class="users-cell-wide"><select name="dept" form="pf{{ r['id'] }}" aria-label="{{ r['username'] }} 승인 담당 부서"><option value="">—</option>{% for d in depts %}<option {{ 'selected' if d == r['dept'] }}>{{ d }}</option>{% endfor %}</select></td>
           <td data-label="처리" class="users-cell-wide"><div class="users-actions">
             <button class="primary" form="pf{{ r['id'] }}" name="act" value="approve">승인</button>
@@ -64,67 +64,31 @@
   <div class="users-table-scroll" tabindex="0" role="region" aria-label="사용자 목록">
     <table class="users-table users-account-table">
       <colgroup><col class="users-col-id"><col class="users-col-name"><col class="users-col-role"><col class="users-col-dept"><col class="users-col-email"><col class="users-col-status"><col class="users-col-manage"></colgroup>
-      <thead><tr><th scope="col">아이디</th><th scope="col">이름</th><th scope="col">역할</th><th scope="col">담당 부서</th><th scope="col">메일</th><th scope="col">상태</th><th scope="col">관리</th></tr></thead>
+      <thead><tr><th scope="col">아이디</th><th scope="col">이름</th><th scope="col">권한</th><th scope="col">담당 부서</th><th scope="col">이메일</th><th scope="col">상태</th><th scope="col">관리</th></tr></thead>
       <tbody>
       {% for r in rows %}
+        {% set me = (r['id'] == g.user['id']) %}
+        {% set ud = user_depts(r) %}
         <tr>
           <td data-label="아이디"><span class="users-cell-text">{{ r['username'] }}</span></td>
-          <td data-label="이름"><span class="users-cell-text">{{ r['display'] }}</span></td>
-          <td data-label="역할" class="users-cell-wide">
-            {% if r['id'] == g.user['id'] %}
-              <span class="users-cell-text">{{ roles[r['role']] }} <span class="muted">(본인)</span></span>
-            {% else %}
-              <form method="post" class="users-control-pair">
-                {{ form_fields('setrole', r['id']) }}
-                <select name="role" aria-label="{{ r['username'] }} 역할" onchange="this.form.elements.namedItem('dept').hidden=this.value!=='uploader'">{% for k,v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == r['role'] }}>{{ v }}</option>{% endfor %}</select>
-                <button>변경</button>
-                <select name="dept" class="users-pair-wide" hidden aria-label="{{ r['username'] }} 역할 변경 시 담당 부서"><option value="">담당 부서 선택</option>{% for d in depts %}<option>{{ d }}</option>{% endfor %}</select>
-              </form>
-            {% endif %}
-          </td>
+          <td data-label="이름"><span class="users-cell-text nw">{{ r['display'] }}</span></td>
+          <td data-label="권한"><span class="users-cell-text nw">{{ roles[r['role']] }}{% if me %} <span class="muted">(본인)</span>{% endif %}</span></td>
           <td data-label="담당 부서" class="users-cell-wide">
-            {% set ud = user_depts(r) %}
-            {% if r['role']=='uploader' %}
-              <div class="users-dept-list">{% for x in ud %}<div>{{ x }}</div>{% endfor %}</div>
-              <details class="users-dept-editor">
-                <summary>담당 부서 바꾸기 (여러 개 가능)</summary>
-                <form method="post">
-                  {{ form_fields('setdepts', r['id']) }}
-                  <div class="users-checkbox-list">
-                    {% for d in depts %}<label><input type="checkbox" name="depts" value="{{ d }}" {{ 'checked' if d in ud }}><span>{{ d }}</span></label>{% endfor %}
-                  </div>
-                  <p class="muted users-team-hint">팀 단위로 지정 (사업부를 고르면 그 아래 팀 전부 담당)</p>
-                  <div class="users-checkbox-list users-team-list">
-                    {% for d in teamkeys %}<label><input type="checkbox" name="depts" value="{{ d }}" {{ 'checked' if d in ud }}><span>{{ d.split(' · ')[1:]|join(' › ') }}</span></label>{% endfor %}
-                  </div>
-                  <button class="primary">저장</button>
-                </form>
-              </details>
+            {% if r['role']=='uploader' and ud %}<div class="users-dept-list">{% for x in ud %}<div>{{ x }}</div>{% endfor %}</div>
             {% else %}<span class="users-cell-text">—</span>{% endif %}
           </td>
-          <td data-label="메일" class="users-cell-wide">
-            <form method="post" class="users-control-pair">
-              {{ form_fields('setemail', r['id']) }}
-              <input name="email" type="email" value="{{ r['email'] or '' }}" placeholder="메일 주소" aria-label="{{ r['username'] }} 메일 주소">
-              <button>저장</button>
-            </form>
-          </td>
+          <td data-label="이메일" class="users-cell-wide"><span class="users-cell-text">{{ r['email'] or '—' }}</span></td>
           <td data-label="상태">
-            {% if r['id'] == g.user['id'] %}<span class="users-cell-text"><span class="users-status is-active">사용</span> <span class="muted">(본인)</span></span>
+            {% if me %}<span class="users-cell-text"><span class="users-status is-active">사용</span></span>
             {% else %}<form method="post" class="users-status-form">{{ form_fields(none, r['id']) }}
               <select name="act" class="users-status-select {{ 'is-active' if r['active'] else 'is-inactive' }}" aria-label="{{ r['username'] }} 상태" onchange="this.form.submit()"><option value="activate" {{ 'selected' if r['active'] }}>사용</option><option value="deactivate" {{ 'selected' if not r['active'] }}>사용중지</option></select>
             </form>{% endif %}</td>
           <td data-label="관리" class="users-cell-wide">
-            <div class="users-management">
-              <form method="post" class="users-actions">
-                {{ form_fields(none, r['id']) }}
-                                {% if r['id'] != g.user['id'] %}<button name="act" value="delete" class="users-delete" data-confirm="{{ r['username'] }} 계정을 삭제할까요?&#10;삭제하면 되돌릴 수 없습니다. (이 계정이 올린 파일·기록은 남습니다)" onclick="return confirm(this.dataset.confirm)">삭제</button>{% endif %}
-              </form>
-              <form method="post" class="users-control-pair">
-                {{ form_fields('reset', r['id']) }}
-                <input name="password" type="password" placeholder="새 비밀번호" aria-label="{{ r['username'] }} 새 비밀번호" autocomplete="new-password" required minlength="8">
-                <button>비밀번호 변경</button>
-              </form>
+            <div class="users-actions">
+              <button type="button" data-dlg="ed{{ r['id'] }}">수정</button>
+              <button type="button" data-dlg="pw{{ r['id'] }}">비밀번호 변경</button>
+              {% if me %}<button type="button" class="users-delete" disabled title="본인 계정은 삭제할 수 없습니다">삭제</button>
+              {% else %}<form method="post" class="users-inline">{{ form_fields(none, r['id']) }}<button name="act" value="delete" class="users-delete" data-confirm="{{ r['username'] }} 계정을 삭제할까요?&#10;삭제하면 되돌릴 수 없습니다. (이 계정이 올린 파일·기록은 남습니다)" onclick="return confirm(this.dataset.confirm)">삭제</button></form>{% endif %}
             </div>
           </td>
         </tr>
@@ -133,4 +97,58 @@
     </table>
   </div>
 </section>
+
+{% for r in rows %}
+{% set me = (r['id'] == g.user['id']) %}
+{% set ud = user_depts(r) %}
+<dialog id="ed{{ r['id'] }}" class="users-dlg">
+  <div class="users-dlg-head"><h3>사용자 수정 · {{ r['username'] }}</h3><button type="button" class="users-dlg-x" data-close aria-label="닫기">×</button></div>
+  <div class="users-dlg-body">
+    {% if not me %}
+    <form method="post" class="users-dlg-sec">
+      {{ form_fields('setrole', r['id']) }}
+      <label>권한</label>
+      <div class="users-control-pair">
+        <select name="role" aria-label="{{ r['username'] }} 권한" onchange="this.form.elements.namedItem('dept').hidden=this.value!=='uploader'">{% for k,v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == r['role'] }}>{{ v }}</option>{% endfor %}</select>
+        <button>권한 변경</button>
+        <select name="dept" class="users-pair-wide" hidden aria-label="담당 부서"><option value="">담당 부서 선택</option>{% for d in depts %}<option>{{ d }}</option>{% endfor %}</select>
+      </div>
+    </form>
+    {% endif %}
+    <form method="post" class="users-dlg-sec">
+      {{ form_fields('setemail', r['id']) }}
+      <label>이메일</label>
+      <div class="users-control-pair"><input name="email" type="email" value="{{ r['email'] or '' }}" placeholder="사내 이메일 주소 입력" aria-label="{{ r['username'] }} 이메일"><button>저장</button></div>
+    </form>
+    {% if r['role']=='uploader' %}
+    <form method="post" class="users-dlg-sec">
+      {{ form_fields('setdepts', r['id']) }}
+      <label>담당 부서 <span class="muted">(여러 개 가능)</span></label>
+      <div class="users-checkbox-list">{% for d in depts %}<label><input type="checkbox" name="depts" value="{{ d }}" {{ 'checked' if d in ud }}><span>{{ d }}</span></label>{% endfor %}</div>
+      <p class="muted users-team-hint">팀 단위로 지정 (사업부를 고르면 그 아래 팀 전부 담당)</p>
+      <div class="users-checkbox-list users-team-list">{% for d in teamkeys %}<label><input type="checkbox" name="depts" value="{{ d }}" {{ 'checked' if d in ud }}><span>{{ d.split(' · ')[1:]|join(' › ') }}</span></label>{% endfor %}</div>
+      <button class="primary">담당 부서 저장</button>
+    </form>
+    {% endif %}
+  </div>
+</dialog>
+<dialog id="pw{{ r['id'] }}" class="users-dlg users-dlg-sm">
+  <form method="post">
+    {{ form_fields('reset', r['id']) }}
+    <div class="users-dlg-head"><h3>비밀번호 변경 · {{ r['username'] }}</h3><button type="button" class="users-dlg-x" data-close aria-label="닫기">×</button></div>
+    <div class="users-dlg-body">
+      <label for="pwi{{ r['id'] }}">새 비밀번호</label>
+      <input id="pwi{{ r['id'] }}" name="password" type="password" placeholder="8자 이상 입력" autocomplete="new-password" required minlength="8">
+      <div class="users-dlg-foot"><button type="button" data-close>취소</button><button class="primary">변경</button></div>
+    </div>
+  </form>
+</dialog>
+{% endfor %}
+<script>
+document.querySelectorAll('[data-dlg]').forEach(function(b){b.addEventListener('click',function(){document.getElementById(b.dataset.dlg).showModal()})});
+document.querySelectorAll('dialog.users-dlg').forEach(function(d){
+  d.addEventListener('click',function(e){if(e.target===d)d.close()});
+  d.querySelectorAll('[data-close]').forEach(function(x){x.addEventListener('click',function(){d.close()})});
+});
+</script>
 {% endblock %}

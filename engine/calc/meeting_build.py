@@ -75,7 +75,7 @@ def _pmv(d, f):
 def _pmd(d, f):
     return dl(d[f][P9 - 1], d[f][P9], "%p") if P9 > 0 else ""
 def _pmc(c):
-    d = c["d"]; return f'<div class="pmc"><em>{E(c["name"])}</em> <span class="y3i">가득 <b>{_pmv(d, "g"):.2f}%</b></span> <span class="y3i">가동 <b>{_pmv(d, "u"):.2f}%</b></span></div>'
+    d = c["d"]; return f'<div class="pmc"><em>{E(c["name"])}</em> <span class="y3i">가득 <b class="vg">{_pmv(d, "g"):.2f}%</b></span><span class="y3i">가동 <b class="vu">{_pmv(d, "u"):.2f}%</b></span></div>'
 PM_GAUGE = (not PREV)   # 월 첫 주(전주 보고 없음)에는 전월 실적도 나침반으로 보여줌
 _pmg = ('<div class="pmg">' + GA.sized(GA.pair(min(_pmv(D, "u"), 100), min(_pmv(D, "g"), 100), None, None, "pmg", True), 300) + '</div>') if PM_GAUGE else ""
 _pmcls = " pm" if PM_GAUGE else ""
@@ -518,15 +518,15 @@ const hdrs=[...sl.querySelectorAll('tr.tmh td, details>summary')];const orig=new
 const f2=v=>v.toFixed(2);
 function setH(h,rows){const sum=k=>rows.reduce((a,r)=>a+(+r.dataset[k]),0);const q=c=>h.querySelector(c);
  const a=q('.m9'),b=q('.m10'),n=q('.mn');if(a)a.textContent=f2(sum('a'));if(b)b.textContent=f2(sum('b'));if(n)n.textContent=rows.length;const cb=q('.cbbase');if(cb)cb.style.display='none'}
-function run(){const hideEx=!ex.checked,minM=+ld.value,q=jb?jb.value:'',act=hideEx||minM>0||!!q;
- const all=[...sl.querySelectorAll('tr[data-b]')];all.forEach(r=>r.classList.toggle('flt',act&&((hideEx&&!!r.dataset.exec)||(minM&&+r.dataset.mon<minM)||(q&&(r.dataset.job||'')!==q))));
+function run(){const hideEx=!ex.checked,minM=+ld.value,q=jb?(jb.value||'').replace(/\s+/g,'').toLowerCase().replace(/^전체직무$/,''):'',act=hideEx||minM>0||!!q;
+ const all=[...sl.querySelectorAll('tr[data-b]')];all.forEach(r=>r.classList.toggle('flt',act&&((hideEx&&!!r.dataset.exec)||(minM&&+r.dataset.mon<minM)||(q&&(r.dataset.job||'').indexOf(q)<0))));
  hdrs.forEach(h=>h.innerHTML=orig.get(h));
  sl.querySelectorAll('tr.tmh').forEach(t=>t.classList.remove('flt'));sl.querySelectorAll('details').forEach(d=>d.style.display='');
  if(!act)return;
  sl.querySelectorAll('tbody').forEach(tb=>{let cur=null,rs=[];const fin=()=>{if(cur){const vis=rs.filter(r=>!r.classList.contains('flt'));setH(cur.querySelector('td'),vis);cur.classList.toggle('flt',!vis.length)}};
   [...tb.children].forEach(tr=>{if(tr.classList.contains('tmh')){fin();cur=tr;rs=[]}else if(tr.dataset.b!==undefined)rs.push(tr)});fin()});
  [...sl.querySelectorAll('details')].reverse().forEach(d=>{const vis=[...d.querySelectorAll('tr[data-b]')].filter(r=>!r.classList.contains('flt'));setH(d.querySelector(':scope>summary'),vis);if(!vis.length)d.style.display='none';else if(q)d.open=true})}
-[ex,ld].forEach(e=>e.addEventListener('change',run));if(jb)jb.addEventListener('input',run)})();
+[ex,ld].forEach(e=>e.addEventListener('change',run));if(jb)['input','change'].forEach(ev=>jb.addEventListener(ev,run))})();
 """
 JS2 = r"""
 (function(){const S2=document.querySelectorAll('.slide')[1],tb=S2.querySelector('table.ht'),box=document.getElementById('gcards'),det=document.getElementById('gdet');
@@ -715,8 +715,9 @@ CSS += r"""
 CSS += r"""
 /* 1110 디자인: 지표 묶음은 항목 단위로만 줄바꿈 */
 .y3i{white-space:nowrap;display:inline-block;margin-right:12px}.y3i:last-child{margin-right:0}
-.yr3{display:grid;grid-template-columns:1fr;gap:8px}
-.yr3 .y3g{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}.yr3 .y3t{font-weight:700;color:var(--navy);margin-right:2px;white-space:nowrap}
+.yr3{display:grid;grid-template-columns:150px repeat(3,max-content);justify-content:start;align-items:center;gap:8px 10px}.yr3 .y3g{display:contents}
+.pmc{display:flex;align-items:center;white-space:nowrap;gap:8px;margin-top:4px}.pmc em{min-width:112px;flex:none}.pmc .y3i{margin:0}.pmc .y3i b.vg{color:#C26D1A}.pmc .y3i b.vu{color:#1D4ED8}.pmc .y3i b{font-weight:800}
+.yr3 .y3t{font-weight:700;color:var(--navy);margin-right:2px;white-space:nowrap}
 .yr3 .y3i{margin-right:0;display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;border-radius:6px;padding:4px 10px;color:#64748B;font-size:14px}
 .yr3 .y3i b{font-weight:700;font-size:15px}.yr3 .y3i b.vg{color:#C26D1A}.yr3 .y3i b.vu{color:#1D4ED8}
 .nw{white-space:nowrap}

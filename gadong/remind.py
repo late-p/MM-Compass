@@ -100,7 +100,7 @@ def register(app):
         d = db.get(); wks = SB.weeks_back(8)
         wl = request.values.get("week") or wks[0][0]; wt = dict(wks).get(wl, wl)
         dl, _ = SB.deadline(wl); dl_txt = SB.dl_text(dl)
-        conf = mail_conf(); live = bool(conf.get("host"))
+        conf = mail_conf(); live = bool(conf.get("host")) and not current_app.config.get("CLOUD_RUNTIME")   # 클라우드는 항상 미리보기(실제 발송 없음)
         T, orphan = targets(wl)
         subj = request.form.get("subject") or DEFAULT_SUBJECT
         body = request.form.get("body") or DEFAULT_BODY

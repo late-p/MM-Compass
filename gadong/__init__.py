@@ -10,6 +10,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, g, request, render_template
 
+# 클라우드(Vercel)에서 임시 디스크에 쓰게 되는 요청 — 저장 성공으로 잘못 안내하지 않도록 막는다.
+FILE_ENDPOINTS = {"upload", "upload_delete", "plan_edit", "my_nochange", "weeks", "targets", "remind"}
+
+def cloud_blocked(endpoint, method, act, remote_files):
+    """클라우드에서 막을 요청인가. 파일 저장소(Supabase) 연결 시에는 안내 메일 '미리보기(act=send)'만 허용한다.
+    메일 서버 설정(act=conf)은 서버 파일(mail.json)에 쓰므로 계속 막는다."""
+    if method in {"GET", "HEAD", "OPTIONS"}: return False
+    if remote_files: return endpoint == "remind" and act != "send"
+    return endpoint in FILE_ENDPOINTS
+
 def create_app():
     # 실행 위치에 관계없이 프로젝트 루트의 .env를 읽는다.
     # Vercel 등 실행 환경에서 이미 지정한 값은 덮어쓰지 않는다.
@@ -87,9 +97,9 @@ def create_app():
     def cloud_file_operations():
         # 계정·인사변동은 PostgreSQL에 저장된다. 파일 저장소 전환 전에는
         # Vercel 임시 디스크에 저장 성공으로 잘못 안내하지 않는다.
-        file_endpoints = {"upload", "upload_delete", "plan_edit", "my_nochange", "weeks", "targets", "remind"}
-        if app.config["REMOTE_FILES"]: file_endpoints = {"remind"}
-        if cloud and request.method not in {"GET", "HEAD", "OPTIONS"} and request.endpoint in file_endpoints:
+        if cloud and cloud_blocked(request.endpoint, request.method, request.form.get("act"), app.config["REMOTE_FILES"]):
+            if request.endpoint == "remind":
+                return render_template("empty.html", msg="클라우드에서는 메일 서버 설정을 저장할 수 없습니다. 제출 안내 메일은 미리보기만 사용할 수 있습니다."), 503
             return render_template("empty.html", msg="파일 업로드·재계산 기능은 준비 중입니다. 로그인과 계정 관리, 인사 변동 제출은 이용할 수 있습니다."), 503
 
     @app.get("/healthz")

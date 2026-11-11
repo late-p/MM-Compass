@@ -52,7 +52,7 @@
 <script>
 (function(){
   const MAILS={{ mails|tojson }}, WT={{ wt|tojson }}, DL={{ dl_txt|tojson }}, SENDER={{ sender|tojson }}, LIVE={{ 'true' if live else 'false' }};
-  const form=document.querySelector('form[method=post]'), modal=document.getElementById('mailModal');
+  const form=document.getElementById('mailGo').closest('form'), modal=document.getElementById('mailModal');   // 머리글의 로그아웃 폼이 아니라 이 버튼이 든 폼
   const $=id=>document.getElementById(id); let list=[], pos=0;
   const fill=(tpl,m)=>String(tpl||'').split('{이름}').join(m.name).split('{주차}').join(WT).split('{부서목록}').join(m.lst).split('{마감}').join(DL).split('{발신자}').join(SENDER);
   function show(){

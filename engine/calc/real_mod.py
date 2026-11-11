@@ -1268,13 +1268,14 @@ ORG_CSS = ORG_CSS + """
   .nw{white-space:nowrap}
   .od-idle table td .leave-tag,.od-idle table td .exec-tag,.leave-tag,.exec-tag{white-space:nowrap!important;word-break:keep-all}
   #idle td .leave-tag,#idle td .exec-tag{white-space:nowrap!important}
+  /* 조직 상세 '대기 인원' 표: 첫 칸이 좁아 배지가 옆 칸으로 넘치므로 이 표에서만 칸 안에서 줄바꿈(날짜는 끊지 않음) */
+  .od-idle table td .leave-tag,.od-idle table td .exec-tag{white-space:normal!important;word-break:keep-all}
   /* 비매출 모수 명단: 표를 박스 좌우 끝까지 채우고, 배너·탭·표 글자의 시작 축(14px)을 같게 */
   .np-list .scroll{padding:0 0 6px!important}
   .np-list table.np-tab{width:100%;table-layout:fixed}
   .np-tab th:first-child,.np-tab td:first-child,table.ca-fix.np-tab td:first-child{padding-left:14px!important}
   .np-tab th:last-child,.np-tab td:last-child{padding-right:14px!important}
   .np-tab tr.np-grp td:first-child{padding-left:14px!important}
-  #a4 table.mtab td:first-child,#a4 table.mtab th:first-child{white-space:nowrap}
 """
 
 ORG_JS = ORG_JS + r"""
@@ -1287,12 +1288,7 @@ ORG_JS = ORG_JS + r"""
       var cg=t.querySelector(':scope>colgroup'); if(!cg||inner<=0) return;
       var cols=[].slice.call(cg.children); var tot=0; cols.forEach(function(c){tot+=parseFloat(c.style.width)||0});
       if(!tot||inner-tot<4||t.dataset.npw==String(Math.round(inner))&&Math.abs(t.offsetWidth-inner)<3) return;
-      var k=inner/tot, first=-1;
-      if(t.closest('#a4')){ // 04 본부별 가득률: 첫 칸(법인/본부)은 좁게 고정, 남는 폭은 월·연간 칸에 나눔
-        var w0=Math.min(parseFloat(cols[0].style.width)||0,170); first=0;
-        k=(inner-w0)/(tot-(parseFloat(cols[0].style.width)||0)); cols[0].style.width=w0.toFixed(1)+'px';
-      }
-      cols.forEach(function(c,i){if(i===first)return;c.style.width=(parseFloat(c.style.width)*k).toFixed(1)+'px'});
+      var k=inner/tot; cols.forEach(function(c){c.style.width=(parseFloat(c.style.width)*k).toFixed(1)+'px'});
       t.style.width=inner+'px'; t.style.minWidth=inner+'px'; t.dataset.npw=String(Math.round(inner));
     });
   }

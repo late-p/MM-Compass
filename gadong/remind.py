@@ -139,4 +139,7 @@ def register(app):
         prev = []
         if T:
             t0 = T[0]; sj, bd = compose(subj, body, t0["u"]["display"], t0["teams"], wt, dl_txt, g.user["display"]); prev = (t0["u"]["display"], sj, bd)
-        return render_template("remind.html", T=T, wks=wks, wl=wl, wt=wt, dl_txt=dl_txt, live=live, conf=conf, last=last, subj=subj, body=body, prev=prev, SBV=SBV, orphan=orphan)
+        # 발송 미리보기 팝업용: 담당자별 받는 사람·부서 목록 (제목·본문은 화면에서 고친 내용으로 브라우저가 채움)
+        mails = [dict(id=t["u"]["id"], name=t["u"]["display"], email=(t["u"]["email"] or "").strip(),
+                      lst="\n".join(f"- {l} · {SBV.get(s, s)}" for l, s in t["teams"])) for t in T]
+        return render_template("remind.html", T=T, wks=wks, wl=wl, wt=wt, dl_txt=dl_txt, live=live, conf=conf, last=last, subj=subj, body=body, prev=prev, SBV=SBV, orphan=orphan, mails=mails, sender=g.user["display"])

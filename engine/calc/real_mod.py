@@ -744,7 +744,7 @@ def _s4():
         mm_need = sum(p["idle"][CUR] for p in ppl if status(p)[0] == "미투입" and not leave_of(p))
         def _row(p):
             st = status(p); ms = p["idle"][CUR:12]
-            badge = '<span class="streak s3">연말까지</span>' if all(v > 0.005 for v in ms) and not p["exec"] else ""
+            badge = '<span class="streak s3">연말까지</span>' if all(v > 0.005 for v in ms) and not p["exec"] and (leave_of(p) or ("",))[0] != "퇴사" and not quit_txt(p) else ""
             tag = '<span class="exec-tag">사업부장</span>' if p["exec"] else ""
             lv = leave_of(p)
             if not lv and quit_txt(p):   # 당월 일부 근무 후 퇴사: 상태도 '퇴사', 이름 옆에 퇴사일 표시 (합계·미투입 집계는 그대로)

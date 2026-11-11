@@ -267,7 +267,7 @@ OLD = list(range(0, P9))            # 그 이전 달(1~N월): 기본은 접어 �
 K_OLD = len(OLD)
 THEAD = ('<thead><tr><th class="l">성명</th><th class="l">소속</th><th class="l">직무</th><th class="l">직급</th>'
          + "".join(f'<th class="old">{m + 1}월</th>' for m in OLD)
-         + f'<th>{P9 + 1}월<small>{"확정" if PM_OK else "잠정"}</small></th><th class="cm">{P10 + 1}월<small>당월</small></th>'
+         + f'<th>{P9 + 1}월{"" if PM_OK else "<small>잠정</small>"}</th><th class="cm">{P10 + 1}월<small>당월</small></th>'
          + "".join(f'<th>{m + 1}월</th>' for m in range(P10 + 1, 12)) + '<th class="l">비고 · 현재·예정 투입</th><th>상태</th></tr></thead>')
 def _idle(p): return p["idle"][P9] > 0.005 or p["idle"][P10] > 0.005
 def _prow(p):

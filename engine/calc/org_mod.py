@@ -217,15 +217,19 @@ function orgDetail(key){
    ${line('가동대상',o.T)}${line('이행 (가득)',o.ex)}${line('제안',o.pr)}${line('R&D·내부과제',o.rd)}${line('대기',o.idle)}
    ${line('가동률',o.u,true,'rate')}${line('가득률',o.g,true,'rate')}</tbody></table></div></div>`;
 }
-function alignDet(d){ /* ALIGN_V3: 바로 위 줄의 칸 폭 그대로 (px · 확대/접기 무관) */
+function alignDet(d){ /* ALIGN_V4: 위 줄의 칸 폭을 '비율(%)'로 맞춤 — 화면 확대·표 선 두께와 무관하게 같은 위치 */
   const t=d.querySelector('.od .scroll>table'); const row=d.previousElementSibling; if(!row||!t) return;
-  const rr=row.getBoundingClientRect(), k=(row.offsetWidth&&rr.width)?rr.width/row.offsetWidth:1;
-  const ws=[...row.children].map(c=>c.getBoundingClientRect().width/k); const tot=ws.reduce((a,b)=>a+b,0); if(!tot) return;
-  t.style.tableLayout='fixed'; t.style.width=tot+'px'; t.style.minWidth=tot+'px';
+  const rr=row.getBoundingClientRect();
+  const ws=[...row.children].map(c=>c.getBoundingClientRect().width); const tot=ws.reduce((a,b)=>a+b,0); if(!tot||!rr.width) return;
+  t.style.tableLayout='fixed'; t.style.maxWidth='none'; t.style.minWidth='0'; t.style.marginLeft='0px'; t.style.width='100%';
   const old=t.querySelector('colgroup'); if(old) old.remove();
   const cg=document.createElement('colgroup');
-  ws.forEach(x=>{if(x<1) return; const c=document.createElement('col'); c.style.width=x+'px'; cg.appendChild(c)}); t.prepend(cg);
+  ws.forEach(x=>{if(x<1) return; const c=document.createElement('col'); c.style.width=(x/tot*100).toFixed(4)+'%'; cg.appendChild(c)}); t.prepend(cg);
   [...t.rows].forEach(r=>[...r.cells].forEach((c,q)=>{c.style.display=(ws[q]!==undefined&&ws[q]<1)?'none':''}));
+  /* 패널 안쪽 여백 등으로 위 줄과 폭·왼쪽 끝이 다르면 그만큼 보정 (표 자신의 화면 배율로 환산) */
+  let tr=t.getBoundingClientRect(); const kk=t.offsetWidth?tr.width/t.offsetWidth:1;
+  if(Math.abs(tr.width-rr.width)>0.5){ t.style.width=(t.offsetWidth*rr.width/tr.width)+'px'; tr=t.getBoundingClientRect(); }
+  const dl=(rr.left-tr.left)/kk; if(Math.abs(dl)>0.3) t.style.marginLeft=dl.toFixed(2)+'px';
 }
 window.__ca_done=()=>{ if(typeof openDet!=='undefined'&&openDet) alignDet(openDet.det) };
 window.addEventListener('resize',()=>{ if(openDet) alignDet(openDet.det) });
@@ -240,7 +244,7 @@ document.querySelectorAll('.mtab tr.org').forEach(r=>{
       r.classList.add('open'); tb.querySelectorAll(`tr[data-parent="${r.dataset.hq}"]`).forEach(x=>x.hidden=false);
     } else if(same) return;
     const d=document.createElement('tr'); d.className='detail-row'; d.innerHTML=`<td colspan="14">${orgDetail(r.dataset.key)}</td>`;
-    r.after(d); r.classList.add('sel'); openDet={row:r,det:d}; alignDet(d);
+    r.after(d); r.classList.add('sel'); openDet={row:r,det:d}; alignDet(d); [200,800].forEach(ms=>setTimeout(()=>{if(openDet&&openDet.det===d)alignDet(d)},ms));
     d.querySelector('.od-x').addEventListener('click',e=>{e.stopPropagation();closeDet()});
   };
   r.addEventListener('click',act); r.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();act()}});

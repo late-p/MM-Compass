@@ -1289,7 +1289,7 @@ ORG_JS = ORG_JS + r"""
       var cols=[].slice.call(cg.children); var tot=0; cols.forEach(function(c){tot+=parseFloat(c.style.width)||0});
       if(!tot||inner-tot<4||t.dataset.npw==String(Math.round(inner))&&Math.abs(t.offsetWidth-inner)<3) return;
       var k=inner/tot; cols.forEach(function(c){c.style.width=(parseFloat(c.style.width)*k).toFixed(1)+'px'});
-      t.style.width=inner+'px'; t.style.minWidth=inner+'px'; t.dataset.npw=String(Math.round(inner));
+      t.style.width=inner+'px'; t.style.minWidth=inner+'px'; t.dataset.npw=String(Math.round(inner)); if(window.__ca_done) window.__ca_done();
     });
   }
   setInterval(stretch,700); window.addEventListener('resize',function(){setTimeout(stretch,400)});

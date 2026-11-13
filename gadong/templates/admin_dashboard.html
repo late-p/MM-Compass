@@ -5,4 +5,5 @@
 {% for w in weeks %}<option value="{{ w['label'] }}" {{ 'selected' if w['label']==sel }}>{{ w['title'] }}{{ ' · 게시됨' if w['published'] }}</option>{% endfor %}</select></form>
 {% if sel %}<a class="btn" href="{{ url_for('admin_raw', label=sel, page='admin.html') }}" target="_blank">새 창으로 열기</a>{% endif %}</div></div>
 {% if sel %}<iframe class="frame" src="{{ url_for('admin_raw', label=sel, page='admin.html') }}" title="관리자 대시보드"></iframe>
+<script>(function(){var f=document.querySelector('iframe.frame');if(!f)return;function fit(){var h=window.innerHeight-(f.getBoundingClientRect().top+window.pageYOffset)-18;if(h>300)f.style.height=h+'px'}fit();window.addEventListener('resize',fit);window.addEventListener('load',fit)})()</script>
 {% else %}<div class="card">아직 만들어진 주차가 없습니다.</div>{% endif %}{% endblock %}
